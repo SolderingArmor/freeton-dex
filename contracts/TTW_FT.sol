@@ -54,8 +54,8 @@ contract TonTokenWallet is ITonTokenWallet
     function calledByOwnerPubKey()  internal inline view returns (bool) {    return(_ownerAddress == addressZero && _walletPublicKey == msg.pubkey());    }
     function calledByOwnerAddress() internal inline view returns (bool) {    return(_ownerAddress == msg.sender  && _walletPublicKey == 0           );    }
 
-    function calledByRootPubKey()  internal inline view returns (bool) {    return(_rootAddress == addressZero   && _rootPublicKey == msg.pubkey()  );    }
-    function calledByRootAddress() internal inline view returns (bool) {    return(_rootAddress == msg.sender    && _rootPublicKey == 0             );    }
+    function calledByRootPubKey()  internal inline view returns (bool)  {    return(_rootAddress == addressZero  && _rootPublicKey == msg.pubkey()  );    }
+    function calledByRootAddress() internal inline view returns (bool)  {    return(_rootAddress == msg.sender   && _rootPublicKey == 0             );    }
 
     modifier onlyOwner {    require(calledByOwnerPubKey() || calledByOwnerAddress(), MESSAGE_SENDER_IS_NOT_MY_OWNER);    _;    }
     modifier onlyRoot  {    require(calledByRootPubKey()  || calledByRootAddress(),  MESSAGE_SENDER_IS_NOT_MY_ROOT );    _;    }
