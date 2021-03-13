@@ -38,8 +38,7 @@ contract DexFactory is IDexFactory
     // Mappings
     mapping(address => Symbol) _listSymbols;
     mapping(address => Symbol) _listSymbolsAwaitingVerification;
-    mapping(address => bool)   _listPairs; // bool if Pair exists or not, i.e. was added to DEX or not;
-    //address[]                  _listPairs;
+    mapping(address => bool)   _listPairs; // bool if Pair exists or not, i.e. was added to DEX;
 
     //========================================
     // Events
@@ -72,12 +71,6 @@ contract DexFactory is IDexFactory
         require(_listSymbolsAwaitingVerification[msg.sender].symbolRTW == msg.sender, 5555);
         
         tvm.accept();
-        //_listSymbolsAwaitingVerification[msg.sender].name     = name;
-        //_listSymbolsAwaitingVerification[msg.sender].symbol   = symbol;
-        //_listSymbolsAwaitingVerification[msg.sender].decimals = decimals;
-
-        //_listSymbols[msg.sender] = _listSymbolsAwaitingVerification[msg.sender];
-        //delete _listSymbolsAwaitingVerification[msg.sender];
 
         _listSymbols[msg.sender].symbolType = _listSymbolsAwaitingVerification[msg.sender].symbolType;
         _listSymbols[msg.sender].symbolRTW  = _listSymbolsAwaitingVerification[msg.sender].symbolRTW;
@@ -88,18 +81,7 @@ contract DexFactory is IDexFactory
         _listSymbols[msg.sender].amount     = _listSymbolsAwaitingVerification[msg.sender].amount;
         
         delete _listSymbolsAwaitingVerification[msg.sender];
-
-        // Symbol added, TTW needs to be added for EACH SymbolPair!
-        //IRootTokenWallet(msg.sender).deployEmptyWalletZPK{value: 1 ton, callback: DexFactory.callback_AddTTW}(1000000000, 0, address(this));
     }
-
-    /*function callback_AddTTW(address addressTTW, uint128 grams, uint256 walletPublicKey, address ownerAddress) public override
-    {
-        require(_listSymbols[msg.sender].symbolRTW == msg.sender, 5555);
-        
-        tvm.accept();
-        _listSymbols[msg.sender].symbolTTW = addressTTW;
-    }*/
 
     //========================================
     // 
@@ -198,7 +180,7 @@ contract DexFactory is IDexFactory
     //
     function addPair(address symbol1RTW, address symbol2RTW) external override
     {
-        // DEV NOTE: for simplicity of the 1st stage of DEX, DexFactory sends 2 TON to every Pair from its own reserves;
+        // DEV NOTE: for simplicity of the 1st stage of DEX, DexFactory sends 10 TON to every Pair from its own reserves;
         //           this behavior is only for simplicity and DEX proof-of-concept, it shouldn't be like this in a final version;
         //
         require(symbol1RTW != symbol2RTW,                       ERROR_SYMBOLS_CANT_BE_THE_SAME);
@@ -210,15 +192,11 @@ contract DexFactory is IDexFactory
         address pairAddress = getPairAddress(symbol1RTW, symbol2RTW);
         require(pairExists(pairAddress) == false, ERROR_PAIR_ALREADY_ADDED);
 
-        //tvm.accept();
-
         (address symbol1, address symbol2) = _sortAddresses(symbol1RTW, symbol2RTW);
         
         (address desiredAddress, TvmCell stateInit) = calculatePairFutureAddress(symbol1RTW, symbol2RTW);
         address newPair = new SymbolPair{stateInit: stateInit, value: 10 ton}();
-        //_listPairs.push(desierdAddress);
         _listPairs[desiredAddress] = true;
-        //ISymbolPair(desiredAddress)._init();
     }
 
     //========================================
@@ -283,7 +261,6 @@ contract DexFactory is IDexFactory
     function getPairAddress(address symbol1RTW, address symbol2RTW) public view override returns (address)
     {
         (address desiredAddress, ) = calculatePairFutureAddress(symbol1RTW, symbol2RTW);
-        //return (_listPairs[desiredAddress] == true ? desiredAddress : addressZero);
         return desiredAddress;
     }
 
@@ -291,11 +268,6 @@ contract DexFactory is IDexFactory
     {
         return (_listPairs[pairAddress] == true);
     }
-
-    /*function getAllPairs() external view override returns (address[])
-    {
-        return _listPairs;
-    }*/
 }
 
 //================================================================================
