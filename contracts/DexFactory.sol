@@ -68,6 +68,9 @@ contract DexFactory is IDexFactory
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
     function callback_VerifyTokenDetails(bytes name, bytes symbol, uint8 decimals) public override
     {
+        require(_listSymbolsAwaitingVerification[msg.sender].symbolRTW == msg.sender, 5555);
+        
+        tvm.accept();
         _listSymbolsAwaitingVerification[msg.sender].name     = name;
         _listSymbolsAwaitingVerification[msg.sender].symbol   = symbol;
         _listSymbolsAwaitingVerification[msg.sender].decimals = decimals;
@@ -253,6 +256,11 @@ contract DexFactory is IDexFactory
         }
 
         return addressZero;
+    }
+
+    function getAllPairs() external view override returns (address[])
+    {
+        return _listPairs;
     }
 }
 

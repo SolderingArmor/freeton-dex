@@ -88,6 +88,10 @@ interface IDexFactory
     /// @param symbol2RTW - RTW address of the Symbol (wallet);
     //
     function getPair(address symbol1RTW, address symbol2RTW) external view returns (address);
+
+    /// @notice Returns addresses of all SymbolPairs contracts;
+    //
+    function getAllPairs() external view returns (address[]);
 }
 
 //================================================================================
