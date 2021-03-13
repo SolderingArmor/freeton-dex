@@ -96,14 +96,12 @@ contract RootTokenWallet is IRootTokenWallet
     //========================================
     //========================================
     //
-    function getTokenDetails() external override returns (bytes, bytes, uint8)
+    function getTokenDetails() external view override returns (bytes, bytes, uint8)
     {
-        // TODO:
-        //IRootTokenWallet_VerifyTokenDetails(msg.sender).callback_VerifyTokenDetails(_name, _symbol, _decimals);
         return (_name, _symbol, _decimals);
     }
 
-    function getTokenDetailsZPK() external responsible override returns (bytes, bytes, uint8)
+    function getTokenDetailsZPK() external view responsible override returns (bytes, bytes, uint8)
     {
         return{value: 0, flag: 64}(_name, _symbol, _decimals);
     }

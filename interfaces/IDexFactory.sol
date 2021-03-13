@@ -15,6 +15,7 @@ interface IDexFactory
     // Callbacks
     //
     function callback_VerifyTokenDetails(bytes name, bytes symbol, uint8 decimals) external;
+    //function callback_AddTTW(address addressTTW, uint128 grams, uint256 walletPublicKey, address ownerAddress) external;
     
     //========================================
     // Management
@@ -42,10 +43,10 @@ interface IDexFactory
     ///               simplicity of DEX Stage 1 Implementation;
     ///         TODO: add TTL to temporary entries to stop DexFactory contract from growing; 
     ///
-    /// @param symbolAddressRTW - RTW address of the Symbol (wallet); 
-    /// @param symbolType       - Type of the fungible token to add, see ISymbolPair for details; 
+    /// @param symbolRTW  - RTW address of the Symbol (wallet); 
+    /// @param symbolType - Type of the fungible token to add, see ISymbolPair for details; 
     //
-    function addSymbol(address symbolAddressRTW, SymbolType symbolType) external;
+    function addSymbol(address symbolRTW, SymbolType symbolType) external;
 
     /// @notice Adds a new SymbolPair to DEX; Both Symbols must be added beforehead; Order of the Symbols doesn't matter;
     ///
@@ -80,18 +81,18 @@ interface IDexFactory
     ///
     /// @param symbolRTW - RTW address of the Symbol (wallet);
     //
-    function SymbolExists(address symbolRTW) external view returns (bool);
+    function symbolExists(address symbolRTW) external view returns (bool);
 
     /// @notice Returns address of a specific SymbolPair contract, (0, 0) on fail; Order of the Symbols doesn't matter;
     ///
     /// @param symbol1RTW - RTW address of the Symbol (wallet);
     /// @param symbol2RTW - RTW address of the Symbol (wallet);
     //
-    function getPair(address symbol1RTW, address symbol2RTW) external view returns (address);
+    function getPairAddress(address symbol1RTW, address symbol2RTW) external view returns (address);
 
     /// @notice Returns addresses of all SymbolPairs contracts;
     //
-    function getAllPairs() external view returns (address[]);
+    //function getAllPairs() external view returns (address[]);
 }
 
 //================================================================================

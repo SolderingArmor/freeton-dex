@@ -26,8 +26,8 @@ interface IRootTokenWallet
     function getWalletAddress   (uint256 walletPublicKey, address ownerAddress) external view             returns (address, uint256, address);
     function getWalletAddressZPK(uint256 walletPublicKey, address ownerAddress) external view responsible returns (address, uint256, address);
     
-    function getTokenDetails()    external             returns (bytes, bytes, uint8);
-    function getTokenDetailsZPK() external responsible returns (bytes, bytes, uint8);
+    function getTokenDetails()    external view             returns (bytes, bytes, uint8);
+    function getTokenDetailsZPK() external view responsible returns (bytes, bytes, uint8);
 
     //========================================
     // Management

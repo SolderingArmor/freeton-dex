@@ -60,45 +60,6 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
     //========================================
     //
-    //function _requestTTWRegistration(address addressRTW) internal view 
-    //{
-        //optional(uint256) pk;
-        
-        /*IRootTokenWallet(addressRTW).deployEmptyWallet{
-            abiVer: 2,
-            extMsg: true,
-            sign: false,
-            time: uint64(now),
-            expire: 0,
-            pubkey: pk,
-            callbackId: tvm.functionId(callbackDeployEmptyWallet),
-            onErrorId: 0
-        }(0, address(this));*/
-
-        //IRootTokenWallet(addressRTW).deployEmptyWalletInternal{value: 1 ton, callback: SymbolPair.callbackDeployEmptyWallet}(0, address(this));
-        //IRootTokenWallet(addressRTW).deployEmptyWallet{value: 2 ton, callback: SymbolPair.callbackDeployEmptyWallet}(1.5 ton, 0, address(this));
-    //}
-
-    constructor() public 
-    {
-        //if(_symbol1.symbolType == SymbolType.Tip3){    IRootTokenWallet(_symbol1.symbolRTW).deployEmptyWallet{value: 2 ton}(0, 0, address(this), true);    }
-        //if(_symbol2.symbolType == SymbolType.Tip3){    IRootTokenWallet(_symbol2.symbolRTW).deployEmptyWallet{value: 2 ton}(0, 0, address(this), true);    }
-
-        if(_symbol1.symbolType == SymbolType.Tip3){    IRootTokenWallet(_symbol1.symbolRTW).deployEmptyWalletZPK{value: 2 ton, callback: SymbolPair.callbackDeployEmptyWallet}(1500000000, 0, address(this));    }
-        if(_symbol2.symbolType == SymbolType.Tip3){    IRootTokenWallet(_symbol2.symbolRTW).deployEmptyWalletZPK{value: 2 ton, callback: SymbolPair.callbackDeployEmptyWallet}(1500000000, 0, address(this));    }
-        
-    }
-    
-    //========================================
-    //
-    /*function callback_DeployEmptyWallet(address newWalletAddress, uint128 grams, uint256 walletPublicKey, address ownerAddress) external override 
-    {
-        require(msg.sender == _symbol1.symbolRTW || msg.sender == _symbol2.symbolRTW, 5555);
-        
-        if(msg.sender == _symbol1.symbolRTW) {    _symbol1.symbolTTW = newWalletAddress;    return;    }
-        if(msg.sender == _symbol2.symbolRTW) {    _symbol2.symbolTTW = newWalletAddress;    return;    } 
-    }*/
-
     /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
     ///      Error: Undeclared identifier. "callbackDeployEmptyWallet" is not (or not yet) visible at this point.
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
@@ -109,6 +70,14 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
         if(msg.sender == _symbol1.symbolRTW) {    _symbol1.symbolTTW = newWalletAddress;    return;    }
         if(msg.sender == _symbol2.symbolRTW) {    _symbol2.symbolTTW = newWalletAddress;    return;    } 
+    }
+
+    constructor() public onlyFactory
+    {        
+        tvm.accept();
+        if(_symbol1.symbolType == SymbolType.Tip3){    IRootTokenWallet(_symbol1.symbolRTW).deployEmptyWalletZPK{value: 2 ton, callback: SymbolPair.callbackDeployEmptyWallet}(2 ton, 0, address(this));    }
+        if(_symbol2.symbolType == SymbolType.Tip3){    IRootTokenWallet(_symbol2.symbolRTW).deployEmptyWalletZPK{value: 2 ton, callback: SymbolPair.callbackDeployEmptyWallet}(2 ton, 0, address(this));    }
+        
     }
     
     //========================================
@@ -137,6 +106,13 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
         uint256 ratio    = symbol1.amount;
         uint8   decimals = 0;
+
+        // Empty
+        if(symbol1.amount == 0 || symbol2.amount == 0)
+        {
+            return (0, 0);
+        }
+
         if(symbol1.decimals >= symbol2.decimals)
         {
             decimals = _localDecimals - (symbol1.decimals - symbol2.decimals);
@@ -156,7 +132,15 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     //
     function depositLiquidity(uint128 amount1, uint128 amount2) external override
     {
+        (uint256 ratio, uint8 decimals) = getPairRatio();
+        if(ratio == 0)
+        {
 
+        }
+        else
+        {
+            
+        }
     }
 
     //========================================

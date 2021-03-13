@@ -23,7 +23,7 @@ contract DexFactory is IDexFactory
     uint constant ERROR_GOVERNANCE_ADDRESS_CANT_BE_EMPTY      = 102;
     uint constant ERROR_SYMBOL_ALREADY_EXISTS                 = 103;
     uint constant ERROR_SYMBOL_DOES_NOT_EXIST                 = 104;
-    uint constant ERROR_PAIR_DOES_NOT_EXIST                   = 105;
+    uint constant ERROR_PAIR_ALREADY_ADDED                    = 105;
     uint constant ERROR_SYMBOLS_CANT_BE_THE_SAME              = 106;
 
     // Variables   
@@ -38,7 +38,8 @@ contract DexFactory is IDexFactory
     // Mappings
     mapping(address => Symbol) _listSymbols;
     mapping(address => Symbol) _listSymbolsAwaitingVerification;
-    address[]                  _listPairs;
+    mapping(address => bool)   _listPairs; // bool if Pair exists or not, i.e. was added to DEX or not;
+    //address[]                  _listPairs;
 
     //========================================
     // Events
@@ -71,13 +72,34 @@ contract DexFactory is IDexFactory
         require(_listSymbolsAwaitingVerification[msg.sender].symbolRTW == msg.sender, 5555);
         
         tvm.accept();
-        _listSymbolsAwaitingVerification[msg.sender].name     = name;
-        _listSymbolsAwaitingVerification[msg.sender].symbol   = symbol;
-        _listSymbolsAwaitingVerification[msg.sender].decimals = decimals;
+        //_listSymbolsAwaitingVerification[msg.sender].name     = name;
+        //_listSymbolsAwaitingVerification[msg.sender].symbol   = symbol;
+        //_listSymbolsAwaitingVerification[msg.sender].decimals = decimals;
 
-        _listSymbols[msg.sender] = _listSymbolsAwaitingVerification[msg.sender];
+        //_listSymbols[msg.sender] = _listSymbolsAwaitingVerification[msg.sender];
+        //delete _listSymbolsAwaitingVerification[msg.sender];
+
+        _listSymbols[msg.sender].symbolType = _listSymbolsAwaitingVerification[msg.sender].symbolType;
+        _listSymbols[msg.sender].symbolRTW  = _listSymbolsAwaitingVerification[msg.sender].symbolRTW;
+        _listSymbols[msg.sender].symbolTTW  = _listSymbolsAwaitingVerification[msg.sender].symbolTTW;
+        _listSymbols[msg.sender].name       = name;
+        _listSymbols[msg.sender].symbol     = symbol;
+        _listSymbols[msg.sender].decimals   = decimals;
+        _listSymbols[msg.sender].amount     = _listSymbolsAwaitingVerification[msg.sender].amount;
+        
         delete _listSymbolsAwaitingVerification[msg.sender];
+
+        // Symbol added, TTW needs to be added for EACH SymbolPair!
+        //IRootTokenWallet(msg.sender).deployEmptyWalletZPK{value: 1 ton, callback: DexFactory.callback_AddTTW}(1000000000, 0, address(this));
     }
+
+    /*function callback_AddTTW(address addressTTW, uint128 grams, uint256 walletPublicKey, address ownerAddress) public override
+    {
+        require(_listSymbols[msg.sender].symbolRTW == msg.sender, 5555);
+        
+        tvm.accept();
+        _listSymbols[msg.sender].symbolTTW = addressTTW;
+    }*/
 
     //========================================
     // 
@@ -150,21 +172,20 @@ contract DexFactory is IDexFactory
     /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
     ///      Error: Undeclared identifier. "addSymbol" is not (or not yet) visible at this point.
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
-    function addSymbol(address symbolAddressRTW, SymbolType symbolType) public override onlyOwner
+    function addSymbol(address symbolRTW, SymbolType symbolType) public override onlyOwner
     {
-        require(SymbolExists(symbolAddressRTW) == false, ERROR_SYMBOL_ALREADY_EXISTS);
+        require(symbolExists(symbolRTW) == false, ERROR_SYMBOL_ALREADY_EXISTS);
         
         tvm.accept();
 
-        _listSymbolsAwaitingVerification[symbolAddressRTW].symbolType = symbolType;
-        _listSymbolsAwaitingVerification[symbolAddressRTW].symbolRTW  = symbolAddressRTW;
-        _listSymbolsAwaitingVerification[symbolAddressRTW].symbolTTW  = addressZero;
-        _listSymbolsAwaitingVerification[symbolAddressRTW].amount     = 0;
+        _listSymbolsAwaitingVerification[symbolRTW].symbolType = symbolType;
+        _listSymbolsAwaitingVerification[symbolRTW].symbolRTW  = symbolRTW;
+        _listSymbolsAwaitingVerification[symbolRTW].symbolTTW  = addressZero;
+        _listSymbolsAwaitingVerification[symbolRTW].amount     = 0;
 
         if(symbolType == SymbolType.Tip3)
         {
-            IRootTokenWallet(symbolAddressRTW).getTokenDetailsZPK{value: 1 ton, callback: callback_VerifyTokenDetails}(); // Populate the details and mark as verified;
-            
+            IRootTokenWallet(symbolRTW).getTokenDetailsZPK{value: 1 ton, callback: DexFactory.callback_VerifyTokenDetails}(); // Populate the details and mark as verified;
         }
 
         if(symbolType == SymbolType.Erc20)
@@ -181,17 +202,23 @@ contract DexFactory is IDexFactory
         //           this behavior is only for simplicity and DEX proof-of-concept, it shouldn't be like this in a final version;
         //
         require(symbol1RTW != symbol2RTW,                       ERROR_SYMBOLS_CANT_BE_THE_SAME);
-        require(SymbolExists(symbol1RTW) == true,               ERROR_SYMBOL_DOES_NOT_EXIST   );
-        require(SymbolExists(symbol2RTW) == true,               ERROR_SYMBOL_DOES_NOT_EXIST   );
-        require(getPair(symbol1RTW, symbol2RTW) == addressZero, ERROR_PAIR_DOES_NOT_EXIST     );
+        require(symbolExists(symbol1RTW) == true,               ERROR_SYMBOL_DOES_NOT_EXIST   );
+        require(symbolExists(symbol2RTW) == true,               ERROR_SYMBOL_DOES_NOT_EXIST   );
 
-        tvm.accept();
+        tvm.accept(); // next require eats too much gas
+                      // TODO: potential attack palce to run DEX out of money
+        address pairAddress = getPairAddress(symbol1RTW, symbol2RTW);
+        require(pairExists(pairAddress) == false, ERROR_PAIR_ALREADY_ADDED);
+
+        //tvm.accept();
 
         (address symbol1, address symbol2) = _sortAddresses(symbol1RTW, symbol2RTW);
         
-        (address desierdAddress, TvmCell stateInit) = calculatePairFutureAddress(symbol1RTW, symbol2RTW);
-        address newPair = new SymbolPair{stateInit: stateInit, value: 2 ton}();
-        _listPairs.push(desierdAddress);
+        (address desiredAddress, TvmCell stateInit) = calculatePairFutureAddress(symbol1RTW, symbol2RTW);
+        address newPair = new SymbolPair{stateInit: stateInit, value: 10 ton}();
+        //_listPairs.push(desierdAddress);
+        _listPairs[desiredAddress] = true;
+        //ISymbolPair(desiredAddress)._init();
     }
 
     //========================================
@@ -201,7 +228,7 @@ contract DexFactory is IDexFactory
         tvm.accept();
 
         _currentFee = fee;
-        for (address addr : _listPairs) 
+        for ((address addr, bool exists) : _listPairs) 
         {
             ISymbolPair(addr).setProviderFee(fee);
         }
@@ -229,7 +256,7 @@ contract DexFactory is IDexFactory
     /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
     ///      Error: Undeclared identifier. "symbolExists" is not (or not yet) visible at this point.
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36/
-    function SymbolExists(address symbolRTW) public view override returns (bool)
+    function symbolExists(address symbolRTW) public view override returns (bool)
     {
         if(symbolRTW == addressZero || _listSymbols[symbolRTW].symbolRTW != addressZero)
         {
@@ -239,29 +266,36 @@ contract DexFactory is IDexFactory
         return false;
     }
 
+    function getSymbol(address symbolRTW) public view returns (Symbol)
+    {
+        return _listSymbols[symbolRTW];
+    }
+
+    function getSymbolAwaiting(address symbolRTW) public view returns (Symbol)
+    {
+        return _listSymbolsAwaitingVerification[symbolRTW];
+    }
+
     //========================================
     /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
     ///      Error: Undeclared identifier. "getPair" is not (or not yet) visible at this point.
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
-    function getPair(address symbol1RTW, address symbol2RTW) public view override returns (address)
+    function getPairAddress(address symbol1RTW, address symbol2RTW) public view override returns (address)
     {
-        // TODO:        
-        (address desierdAddress, ) = calculatePairFutureAddress(symbol1RTW, symbol2RTW);
-        for (address addr : _listPairs) 
-        {
-            if(addr == desierdAddress)
-            {
-                return addr;   
-            }
-        }
-
-        return addressZero;
+        (address desiredAddress, ) = calculatePairFutureAddress(symbol1RTW, symbol2RTW);
+        //return (_listPairs[desiredAddress] == true ? desiredAddress : addressZero);
+        return desiredAddress;
     }
 
-    function getAllPairs() external view override returns (address[])
+    function pairExists(address pairAddress) public view returns (bool)
+    {
+        return (_listPairs[pairAddress] == true);
+    }
+
+    /*function getAllPairs() external view override returns (address[])
     {
         return _listPairs;
-    }
+    }*/
 }
 
 //================================================================================
