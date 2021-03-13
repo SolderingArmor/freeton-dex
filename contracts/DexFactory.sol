@@ -12,7 +12,7 @@ import "SymbolPair.sol";
 
 //================================================================================
 //
-contract DexFactory is IDexFactory, IRootTokenWallet_VerifyTokenDetails
+contract DexFactory is IDexFactory
 {    
     // Constants
     address constant addressZero = address.makeAddrStd(0, 0);
@@ -63,7 +63,10 @@ contract DexFactory is IDexFactory, IRootTokenWallet_VerifyTokenDetails
 
     //========================================
     // Callbacks
-    function callback_VerifyTokenDetails(bytes name, bytes symbol, uint8 decimals) external override
+    /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
+    ///      Error: Undeclared identifier. "callback_VerifyTokenDetails" is not (or not yet) visible at this point.
+    ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
+    function callback_VerifyTokenDetails(bytes name, bytes symbol, uint8 decimals) public override
     {
         _listSymbolsAwaitingVerification[msg.sender].name     = name;
         _listSymbolsAwaitingVerification[msg.sender].symbol   = symbol;
@@ -157,7 +160,8 @@ contract DexFactory is IDexFactory, IRootTokenWallet_VerifyTokenDetails
 
         if(symbolType == SymbolType.Tip3)
         {
-            IRootTokenWallet(symbolAddressRTW).getTokenDetails(); // Populate the details and mark as verified;
+            IRootTokenWallet(symbolAddressRTW).getTokenDetailsZPK{value: 1 ton, callback: callback_VerifyTokenDetails}(); // Populate the details and mark as verified;
+            
         }
 
         if(symbolType == SymbolType.Erc20)

@@ -12,6 +12,11 @@ import "../interfaces/ISymbolPair.sol";
 interface IDexFactory
 {
     //========================================
+    // Callbacks
+    //
+    function callback_VerifyTokenDetails(bytes name, bytes symbol, uint8 decimals) external;
+    
+    //========================================
     // Management
     //
     /// @notice Sets new DEX owner;
