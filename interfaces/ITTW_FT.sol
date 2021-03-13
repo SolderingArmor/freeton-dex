@@ -16,7 +16,6 @@ interface ITonTokenWallet
     function getDecimals()                     external view returns (uint8);
     function getBalance()                      external view returns (uint128);
     function getWalletKey()                    external view returns (uint256);
-    function getRootKey()                      external view returns (uint256);
     function getRootAddress()                  external view returns (address);
     function getOwnerAddress()                 external view returns (address);
     function getCode()                         external view returns (TvmCell);

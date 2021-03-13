@@ -37,7 +37,6 @@ contract TonTokenWallet is ITonTokenWallet
     bytes   static  _symbol;          //
     uint8   static  _decimals;        //
     uint128 private _balance;         //
-    uint256 static  _rootPublicKey;   //
     uint256 static  _walletPublicKey; //
     address static  _rootAddress;     //
     address static  _ownerAddress;    //
@@ -54,11 +53,8 @@ contract TonTokenWallet is ITonTokenWallet
     function calledByOwnerPubKey()  internal inline view returns (bool) {    return(_ownerAddress == addressZero && _walletPublicKey == msg.pubkey());    }
     function calledByOwnerAddress() internal inline view returns (bool) {    return(_ownerAddress == msg.sender  && _walletPublicKey == 0           );    }
 
-    function calledByRootPubKey()   internal inline view returns (bool) {    return(_rootPublicKey == msg.pubkey()  );    }
-    function calledByRootAddress()  internal inline view returns (bool) {    return(_rootAddress == msg.sender      );    }
-
     modifier onlyOwner {    require(calledByOwnerPubKey() || calledByOwnerAddress(), MESSAGE_SENDER_IS_NOT_MY_OWNER);    _;    }
-    modifier onlyRoot  {    require(calledByRootPubKey()  || calledByRootAddress(),  MESSAGE_SENDER_IS_NOT_MY_ROOT );    _;    }
+    modifier onlyRoot  {    require(_rootAddress == msg.sender,                      MESSAGE_SENDER_IS_NOT_MY_ROOT );    _;    }
 
     //========================================
     //========================================
@@ -69,7 +65,6 @@ contract TonTokenWallet is ITonTokenWallet
     function getSymbol()                       external view override returns (bytes)   {    return _symbol;                        }
     function getDecimals()                     external view override returns (uint8)   {    return _decimals;                      }
     function getBalance()                      external view override returns (uint128) {    return _balance;                       }
-    function getRootKey()                      external view override returns (uint256) {    return _rootPublicKey;                 }
     function getWalletKey()                    external view override returns (uint256) {    return _walletPublicKey;               }
     function getRootAddress()                  external view override returns (address) {    return _rootAddress;                   }
     function getOwnerAddress()                 external view override returns (address) {    return _ownerAddress;                  }
@@ -87,7 +82,6 @@ contract TonTokenWallet is ITonTokenWallet
                 _name:            _name,
                 _symbol:          _symbol,
                 _decimals:        _decimals,
-                _rootPublicKey:   _rootPublicKey,
                 _walletPublicKey: ownerPubKey,
                 _rootAddress:     _rootAddress,
                 _ownerAddress:    ownerAddress,

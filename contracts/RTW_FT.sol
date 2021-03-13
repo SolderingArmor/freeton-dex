@@ -64,7 +64,6 @@ contract RootTokenWallet is IRootTokenWallet
                 _name:            _name,
                 _symbol:          _symbol,
                 _decimals:        _decimals,
-                _rootPublicKey:   _rootPublicKey,
                 _walletPublicKey: ownerPubKey,
                 _rootAddress:     address(this),
                 _ownerAddress:    ownerAddress,
@@ -117,7 +116,9 @@ contract RootTokenWallet is IRootTokenWallet
     {
         if( zpk && !calledByOwnerAddress()) {    return (MESSAGE_SENDER_IS_NOT_MY_OWNER, addressZero);    }
         if(!zpk && !calledByOwnerPubKey() ) {    return (MESSAGE_SENDER_IS_NOT_MY_OWNER, addressZero);    }
-
+        if(walletPublicKey == 0 && ownerAddress == addressZero){    return (5555, addressZero);    } // both zero
+        if(walletPublicKey != 0 && ownerAddress != addressZero){    return (5555, addressZero);    } // something should be zero        
+    
         if(!zpk){ tvm.accept(); }
         (address desiredAddress, TvmCell stateInit) = calculateFutureAddress(walletPublicKey, ownerAddress);
         address newTTW = new TonTokenWallet{stateInit: stateInit, value: grams}();
@@ -127,6 +128,9 @@ contract RootTokenWallet is IRootTokenWallet
 
     function _deployEmptyWallet(bool zpk, uint128 grams, uint256 walletPublicKey, address ownerAddress) internal returns (uint, address)
     {
+        if(walletPublicKey == 0 && ownerAddress == addressZero){    return (5555, addressZero);    } // both zero
+        if(walletPublicKey != 0 && ownerAddress != addressZero){    return (5555, addressZero);    } // something should be zero
+        
         if(!zpk){ tvm.accept(); }
         (address desiredAddress, TvmCell stateInit) = calculateFutureAddress(walletPublicKey, ownerAddress);
         address newTTW = new TonTokenWallet{stateInit: stateInit, value: grams}();
