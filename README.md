@@ -1,5 +1,8 @@
 # Free TON DEX
 
+## Description
+LP AMM decentralized exchange.
+
 ## Modules
 * TTW_FT.sol - Ton Token Wallet, custom TIP-3 token wallet; CHANGES:
     * Has allowance mappings (for both addresses and public keys);
