@@ -53,8 +53,6 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     mapping(uint256 => manageLiquidityStatus) _withdrawLiquidityStatus; //
     mapping(uint256 => swapTokenStatus)       _swapTokenStatus;         //
     
-    
-
     //========================================
     //
     /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
@@ -74,7 +72,140 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
     function callbackSendTokensWithResolve(uint errorCode, uint128 tokens, uint128 grams, uint256 pubKeyToResolve) public override 
     {
+        // we will purposely do nothing here, just grab our change
+    }
 
+    /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
+    ///      Error: Undeclared identifier. "callbackGetTTWAddressForSwap" is not (or not yet) visible at this point.
+    ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
+    function callbackSwapGetTTWAddress(address targetAddress, uint256 walletPublicKey, address ownerAddress) public override 
+    {
+        require(msg.sender == _symbol1.symbolRTW || msg.sender == _symbol2.symbolRTW, 5555);
+        tvm.accept();
+        
+        bool direction = _swapTokenStatus[walletPublicKey].direction; // true means "get symbol1 and give symbol2", false means "give symbol1 and get symbol2"
+        if(direction)
+        {
+            _swapTokenStatus[walletPublicKey].symbol2TTW = targetAddress;
+            ITonTokenWallet(targetAddress).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackSwapGetTransferResult}(_swapTokenStatus[walletPublicKey].symbol2Requested, targetAddress);
+        }
+        else
+        {
+            _swapTokenStatus[walletPublicKey].symbol1TTW = targetAddress;
+            ITonTokenWallet(targetAddress).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackSwapGetTransferResult}(_swapTokenStatus[walletPublicKey].symbol1Requested, targetAddress);
+        }
+    }
+
+    /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
+    ///      Error: Undeclared identifier. "callbackSwapGetTransferResult" is not (or not yet) visible at this point.
+    ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
+    function callbackSwapGetTransferResult(uint errorCode, uint128 tokens, address to) public override 
+    {
+        tvm.accept();
+        
+        uint256 publicKey = 0;
+        for((uint256 pk, swapTokenStatus status) : _swapTokenStatus)
+        {
+            if(status.symbol1TTW == msg.sender && status.symbol1Requested == tokens)
+            {
+                publicKey = pk;
+                break;
+            }
+            if(status.symbol2TTW == msg.sender && status.symbol2Requested == tokens)
+            {
+                publicKey = pk;
+                break;
+            }
+        }
+
+        if(_swapTokenStatus[publicKey].direction == true) // true means "get symbol1 and give symbol2", false means "give symbol1 and get symbol2"
+        {
+            // TODO: adjust price
+            _swapTokenStatus[publicKey].symbol2Error     = errorCode;
+            _swapTokenStatus[publicKey].symbol2Processed = tokens;
+            if(errorCode == 0)
+            {
+                ITonTokenWallet(_symbol1.symbolRTW).sendTokensResolveAddress{value: 0.1 ton}(_swapTokenStatus[publicKey].symbol1Requested, 0, publicKey);
+                _swapTokenStatus[publicKey].symbol1Processed = _swapTokenStatus[publicKey].symbol1Requested;
+                _symbol1.amount -= _swapTokenStatus[publicKey].symbol1Requested;
+                _symbol2.amount += tokens;
+            }
+        }
+        else
+        {
+            // TODO: adjust price
+            _swapTokenStatus[publicKey].symbol1Error     = errorCode;
+            _swapTokenStatus[publicKey].symbol1Processed = tokens;
+            if(errorCode == 0)
+            {
+                ITonTokenWallet(_symbol2.symbolRTW).sendTokensResolveAddress{value: 0.1 ton}(_swapTokenStatus[publicKey].symbol2Requested, 0, publicKey);
+                _swapTokenStatus[publicKey].symbol2Processed = _swapTokenStatus[publicKey].symbol2Requested;
+                _symbol2.amount -= _swapTokenStatus[publicKey].symbol2Requested;
+                _symbol1.amount += tokens;
+            }
+        }
+        
+        _swapTokenStatus[publicKey].done = true;
+    }
+
+    //========================================
+    //
+    /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
+    ///      Error: Undeclared identifier. "callbackDepositGetTTWAddress" is not (or not yet) visible at this point.
+    ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
+    function callbackDepositGetTTWAddress(address targetAddress, uint256 walletPublicKey, address ownerAddress) public override 
+    {
+        require(msg.sender == _symbol1.symbolRTW || msg.sender == _symbol2.symbolRTW, 5555);
+        tvm.accept();
+        
+        if(msg.sender == _symbol1.symbolRTW)
+        {
+            _depositLiquidityStatus[walletPublicKey].symbol1TTW = targetAddress;
+            ITonTokenWallet(targetAddress).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackDepositGetTransferResult}(_depositLiquidityStatus[walletPublicKey].symbol1Requested, targetAddress);
+        }
+        else
+        {
+            _depositLiquidityStatus[walletPublicKey].symbol2TTW = targetAddress;
+            ITonTokenWallet(targetAddress).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackDepositGetTransferResult}(_depositLiquidityStatus[walletPublicKey].symbol2Requested, targetAddress);
+        }
+    }
+
+    /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
+    ///      Error: Undeclared identifier. "callbackSwapGetTransferResult" is not (or not yet) visible at this point.
+    ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
+    function callbackDepositGetTransferResult(uint errorCode, uint128 tokens, address to) public override 
+    {
+        tvm.accept();
+        
+        uint256 publicKey = 0;
+        for((uint256 pk, manageLiquidityStatus status) : _depositLiquidityStatus)
+        {
+            if(status.symbol1TTW == msg.sender && status.symbol1Requested == tokens)
+            {
+                publicKey = pk;
+                _depositLiquidityStatus[pk].symbol1Processed = tokens;
+                _depositLiquidityStatus[pk].symbol1Error     = errorCode;
+                break;
+            }
+            if(status.symbol2TTW == msg.sender && status.symbol2Requested == tokens)
+            {
+                publicKey = pk;
+                _depositLiquidityStatus[pk].symbol2Processed = tokens;
+                _depositLiquidityStatus[pk].symbol2Error     = errorCode;
+                break;
+            }
+        }
+
+        if(_depositLiquidityStatus[publicKey].symbol1Error > 0 || _depositLiquidityStatus[publicKey].symbol2Error > 0)
+        {
+            _depositLiquidityStatus[publicKey].done = true;
+            return;
+        }
+
+        if(_depositLiquidityStatus[publicKey].symbol1Processed > 0 && _depositLiquidityStatus[publicKey].symbol2Processed > 0)
+        {
+            // TODO: paste calculations here
+        }
     }
 
     //========================================
@@ -131,6 +262,8 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
     //========================================
     // TODO: need to add "maximum slippage" to prevent a Liquidity provider to provide Liquidity having a bad ratio
+    // TODO: Current limitations: only Public Key owners can deposit and withdraw liquidity;
+    //       their TIP-3 address will be calculated from their Public Key;
     function depositLiquidity(uint128 amount1, uint128 amount2) external override returns(manageLiquidityStatus)
     {
         tvm.accept();
@@ -138,7 +271,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
         // Check if this user has unfinished deposits
         if(_depositLiquidityStatus[msg.pubkey()].dtRequested != 0)
         {
-            if(now - _depositLiquidityStatus[msg.pubkey()].dtRequested <= 600) // we give it 10 minutes to process
+            if(now - _depositLiquidityStatus[msg.pubkey()].dtRequested <= 60) // we give it 1 minute to process
             {
                 require(false, 5555);
             }
@@ -213,11 +346,13 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
         _depositLiquidityStatus[msg.pubkey()].symbol2Processed = 0;
         _depositLiquidityStatus[msg.pubkey()].symbol2Error     = 0;
 
+
+
         // ONLY FOR TESTING!
         // TODO: CHANGE:
         // TODO: ADD USER LIQUIDITY
         // Liquidity provided is calculated based on _symbol1 ratio;
-        
+
         uint256 liquidityRatio = 0;
         uint256 newLiquidity   = 0;
         if(_symbol1.amount == 0)
@@ -246,13 +381,6 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
         _symbol1.amount += finalAmount1;
         _symbol2.amount += finalAmount2;
 
-
-
-        //uint256 ratio = (_totalLiquidity * 10**uint256(_localDecimals)) / uint256(amountLiquidity);
-        //uint256 liquidityChange = uint256(finalAmount1) * uint256(finalAmount2);
-        //_totalLiquidity += liquidityChange;
-        //_userLiquidity[msg.pubkey()] += liquidityChange;
-
         manageLiquidityStatus kek = _depositLiquidityStatus[msg.pubkey()];
         delete _depositLiquidityStatus[msg.pubkey()];
 
@@ -262,7 +390,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     //========================================
     // TODO: Current limitations: only Public Key owners can deposit and withdraw liquidity;
     //       their TIP-3 address will be calculated from their Public Key;
-    function withdrawLiquidity(uint256 amountLiquidity, address crystalWalletAddress) external override 
+    function withdrawLiquidity(uint256 amountLiquidity) external override 
     {
         require(msg.pubkey() != 0,                               5555);
         require(amountLiquidity > 0,                             5556);
@@ -276,17 +404,17 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
         // About every Symbol custom precision - we do not need to care about it;
 
         uint256 ratio = (_totalLiquidity * 10**uint256(_localDecimals)) / uint256(amountLiquidity);
-        uint256 amountSymbol1 = (uint256(_symbol1.amount) * 10**uint256(_localDecimals)) / ratio;    amountSymbol1 /= 10**uint256(_localDecimals); // no need for extra precision anymore;
-        uint256 amountSymbol2 = (uint256(_symbol2.amount) * 10**uint256(_localDecimals)) / ratio;    amountSymbol2 /= 10**uint256(_localDecimals); // no need for extra precision anymore;
+        uint256 amountSymbol1 = (uint256(_symbol1.amount) * 10**uint256(_localDecimals)) / ratio;    amountSymbol1 /= 10**uint256(_localDecimals); // 
+        uint256 amountSymbol2 = (uint256(_symbol2.amount) * 10**uint256(_localDecimals)) / ratio;    amountSymbol2 /= 10**uint256(_localDecimals); // 
 
         // Symbol1
-        //if(_symbol1.symbolType == SymbolType.TonCrystal) {    crystalWalletAddress.transfer(uint128(amountSymbol1), true, 0);    } // TODO: revisit flag 0
-        //if(_symbol1.symbolType == SymbolType.Tip3)       {    ITonTokenWallet(_symbol1.symbolTTW).sendTokensResolveAddressZPK{value: 1 ton, callback: callbackSendTokensWithResolve}(uint128(amountSymbol1), 1 ton, msg.pubkey());  }
+        //if(_symbol1.symbolType == SymbolType.TonCrystal) { } // CURENTLY NOT IMPLEMENTED
+        if(_symbol1.symbolType == SymbolType.Tip3)         {    ITonTokenWallet(_symbol1.symbolTTW).sendTokensResolveAddressZPK{value: 1 ton, callback: callbackSendTokensWithResolve}(uint128(amountSymbol1), 1 ton, msg.pubkey());  }
         //if(_symbol1.symbolType == SymbolType.Erc20)      { } // CURENTLY NOT IMPLEMENTED
 
         // Symbol2
-        //if(_symbol2.symbolType == SymbolType.TonCrystal) {    crystalWalletAddress.transfer(uint128(amountSymbol2), true, 0);    } // TODO: revisit flag 0
-        //if(_symbol2.symbolType == SymbolType.Tip3)       {    ITonTokenWallet(_symbol2.symbolTTW).sendTokensResolveAddressZPK{value: 1 ton, callback: callbackSendTokensWithResolve}(uint128(amountSymbol2), 1 ton, msg.pubkey());  }
+        //if(_symbol2.symbolType == SymbolType.TonCrystal) { } // CURENTLY NOT IMPLEMENTED
+        if(_symbol2.symbolType == SymbolType.Tip3)         {    ITonTokenWallet(_symbol2.symbolTTW).sendTokensResolveAddressZPK{value: 1 ton, callback: callbackSendTokensWithResolve}(uint128(amountSymbol2), 1 ton, msg.pubkey());  }
         //if(_symbol2.symbolType == SymbolType.Erc20)      { } // CURENTLY NOT IMPLEMENTED
 
         _symbol1.amount              -= amountSymbol1;
@@ -335,41 +463,58 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
     //========================================
     //
-    function getPrice(address RTW_ofTokenToGet, address RTW_ofTokenToGive, uint128 amountToGive) external view override returns (uint256, uint8) 
+    function getPrice(address RTW_ofTokenToGet, address RTW_ofTokenToGive, uint128 amountToGive) public view override returns (uint256, uint8) 
     {
         require(RTW_ofTokenToGet != RTW_ofTokenToGive,                                              ERROR_SYMBOLS_SHOULD_BE_DIFFERENT        );
-        require(RTW_ofTokenToGet != addressZero || RTW_ofTokenToGive != addressZero,                ERROR_SYMBOLS_SHOULD_HAVE_VALID_ADDRESSES);
+        require(RTW_ofTokenToGet != addressZero && RTW_ofTokenToGive != addressZero,                ERROR_SYMBOLS_SHOULD_HAVE_VALID_ADDRESSES);
         require(RTW_ofTokenToGet  == _symbol1.symbolRTW || RTW_ofTokenToGet  == _symbol2.symbolRTW, ERROR_SYMBOL_MISSING                     );
         require(RTW_ofTokenToGive == _symbol1.symbolRTW || RTW_ofTokenToGive == _symbol2.symbolRTW, ERROR_SYMBOL_MISSING                     );
 
-        Symbol symbolGet  = RTW_ofTokenToGet  == _symbol1.symbolRTW ? _symbol1 : _symbol2; // 
-        Symbol symbolGive = RTW_ofTokenToGive == _symbol1.symbolRTW ? _symbol1 : _symbol2; // 
+        Symbol symbolGet  = (RTW_ofTokenToGet  == _symbol1.symbolRTW ? _symbol1 : _symbol2); // 
+        Symbol symbolGive = (RTW_ofTokenToGive == _symbol1.symbolRTW ? _symbol1 : _symbol2); // 
 
         uint256 tokenReserve = symbolGet.amount;
+
         uint256 tokensToBuy = getPriceInternal(amountToGive, tokenReserve, symbolGive.amount);
 
-        uint8 decimals = 0;
-        if(symbolGet.decimals >= symbolGive.decimals)
-        {
-            decimals = symbolGet.decimals - symbolGive.decimals;
-        }
-        else 
-        {
-            uint8 pow = symbolGive.decimals - symbolGet.decimals;
-            tokensToBuy = tokensToBuy * (10**uint256(pow));
-        }
-
-        return (tokensToBuy, decimals);
+        return (tokensToBuy, symbolGet.decimals);
     }
 
     //========================================
     // TODO: need to add "maximum slippage" to prevent a Liquidity provider to provide Liquidity having a bad ratio
     function swapTokens(address tokenToGet, address tokenToGive, uint128 amountToGive) external override
     {
-        (uint256 liquidity, uint8 decimals) = getPairLiquidity();
-        require(minimumLiquidity * 10**uint256(decimals) < liquidity, 111);
+        require(msg.pubkey() != 0, 5555);
+        
+        (uint256 tmpLiquidity, uint8 tmpDecimals) = getPairLiquidity();
+        require(minimumLiquidity * 10**uint256(tmpDecimals) < tmpLiquidity, 1112);
+
+        // Check if this user has unfinished deposits
+        if(_swapTokenStatus[msg.pubkey()].dtRequested != 0)
+        {
+            if(now - _swapTokenStatus[msg.pubkey()].dtRequested <= 60 && !_swapTokenStatus[msg.pubkey()].done) // we give it 1 minute to process
+            {
+                require(false, 5555);
+            }
+            else
+            {
+                delete _swapTokenStatus[msg.pubkey()];
+            }
+        }
+
+        tvm.accept();
 
         // TODO
+        (uint256 price, uint8 decimals) = getPrice(tokenToGet, tokenToGive, amountToGive);
+
+        _swapTokenStatus[msg.pubkey()].dtRequested      = now;
+        _swapTokenStatus[msg.pubkey()].direction        = (tokenToGet == _symbol1.symbolRTW); // true means "get symbol1 and give symbol2", false means "give symbol1 and get symbol2"
+        _swapTokenStatus[msg.pubkey()].symbol1Requested = (tokenToGet == _symbol1.symbolRTW ? uint128(price) : uint128(amountToGive));
+        _swapTokenStatus[msg.pubkey()].symbol2Requested = (tokenToGet == _symbol1.symbolRTW ? uint128(price) : uint128(amountToGive));
+        _swapTokenStatus[msg.pubkey()].done = false;
+
+        address RTW = (_swapTokenStatus[msg.pubkey()].direction ? _symbol2.symbolRTW : _symbol1.symbolRTW ); 
+        IRootTokenWallet(RTW).getWalletAddressZPK{value: 1 ton, callback: callbackSwapGetTTWAddress}(msg.pubkey(), addressZero);
     }
 }
 

@@ -10,6 +10,9 @@ ZERO_ADDRESS="0:0000000000000000000000000000000000000000000000000000000000000000
 
 NETWORK=$(./get_url.sh)
 
+RTW1_ADDRESS=$(./get_rtw1_address.sh)
+RTW2_ADDRESS=$(./get_rtw2_address.sh)
+
 echo "===================================================================================================="
 PAIR_ADDRESS=$(./get_symbol_pair_address.sh)
 echo "PAIR ADDRESS: $PAIR_ADDRESS"
@@ -29,6 +32,7 @@ echo "==========================================================================
 echo "depositLiquidity"
 echo "===================================================================================================="
 tonos-cli -u $NETWORK call $PAIR_ADDRESS depositLiquidity '{"amount1":"40000000000000", "amount2":"1234000000000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
+tonos-cli -u $NETWORK call $PAIR_ADDRESS depositLiquidity '{"amount1":"40000000000000", "amount2":"1234000000000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
 #tonos-cli -u $NETWORK call $PAIR_ADDRESS depositLiquidity '{"amount1":"40000000000000", "amount2":"123400000000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
 #tonos-cli -u $NETWORK call $PAIR_ADDRESS depositLiquidity '{"amount1":"76234876324866", "amount2":"12344563456000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
 
@@ -45,9 +49,18 @@ tonos-cli -u $NETWORK run $PAIR_ADDRESS getUserTotalLiquidity '{}' --abi ../cont
 tonos-cli -u $NETWORK run $PAIR_ADDRESS getUserLiquidity '{"ownerPubKey":"0x'$PUBKEY1'"}' --abi ../contracts/SymbolPair.abi.json | awk '/Result: {/,/}/'
 
 echo "===================================================================================================="
+echo "getPrice 1-2"
+echo "===================================================================================================="
+tonos-cli -u $NETWORK run $PAIR_ADDRESS getPrice '{"RTW_ofTokenToGet":"'$RTW1_ADDRESS'","RTW_ofTokenToGive":"'$RTW2_ADDRESS'","amountToGive":"1000000000000"}' --abi ../contracts/SymbolPair.abi.json | awk '/Result: {/,/}/'
+echo "===================================================================================================="
+echo "getPrice 2-1"
+echo "===================================================================================================="
+tonos-cli -u $NETWORK run $PAIR_ADDRESS getPrice '{"RTW_ofTokenToGet":"'$RTW2_ADDRESS'","RTW_ofTokenToGive":"'$RTW1_ADDRESS'","amountToGive":"1000000000"}' --abi ../contracts/SymbolPair.abi.json | awk '/Result: {/,/}/'
+
+echo "===================================================================================================="
 echo "withdrawLiquidity"
 echo "===================================================================================================="
-tonos-cli -u $NETWORK call $PAIR_ADDRESS withdrawLiquidity '{"amountLiquidity":"40000000000000000000", "crystalWalletAddress":"'$ZERO_ADDRESS'"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
+tonos-cli -u $NETWORK call $PAIR_ADDRESS withdrawLiquidity '{"amountLiquidity":"40000000000000000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
 
 echo "===================================================================================================="
 echo "getPairLiquidity"

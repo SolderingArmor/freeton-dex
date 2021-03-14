@@ -31,26 +31,32 @@ struct Symbol
 struct manageLiquidityStatus // both deposit and withdraw
 {
     uint32  dtRequested;
+    address symbol1TTW;
     uint128 symbol1Requested;
     uint128 symbol1ToProcess;
     uint128 symbol1Processed;
     uint    symbol1Error;
+    address symbol2TTW;
     uint128 symbol2Requested;
     uint128 symbol2ToProcess;
     uint128 symbol2Processed;
     uint    symbol2Error;
+    bool    done;
 }
 
 struct swapTokenStatus
 {
     uint32  dtRequested;
     bool    direction;        // true means "get symbol1 and give symbol2", false means "give symbol1 and get symbol2"
+    address symbol1TTW;
     uint128 symbol1Requested;
     uint128 symbol1Processed;
     uint    symbol1Error;
+    address symbol2TTW;
     uint128 symbol2Requested;
     uint128 symbol2Processed;
     uint    symbol2Error;
+    bool    done;
 }
 
 /*struct StateMachineAction
@@ -94,12 +100,12 @@ interface ISymbolPair
 
     //========================================
     // Liquidity
-    function getPairRatio(bool firstFirst)                                            external view returns (uint256, uint8); // Returns current pool ratio and decimals, is needed to perform correct "depositLiquidity";
-    function depositLiquidity (uint128 amount1, uint128 amount2)                      external returns(manageLiquidityStatus);                               // ORDER OF SYMBOLS MATTERS
-    function withdrawLiquidity(uint256 amountLiquidity, address crystalWalletAddress) external;                               //
-    function getPairLiquidity ()                                                      external view returns (uint256, uint8); //
-    function getUserLiquidity (uint256 ownerPubKey)                                   external view returns (uint256, uint8); //
-    function getUserTotalLiquidity ()                                                 external view returns (uint256, uint8); //
+    function getPairRatio(bool firstFirst)                       external view returns (uint256, uint8); // Returns current pool ratio and decimals, is needed to perform correct "depositLiquidity";
+    function depositLiquidity (uint128 amount1, uint128 amount2) external returns(manageLiquidityStatus);                               // ORDER OF SYMBOLS MATTERS
+    function withdrawLiquidity(uint256 amountLiquidity)          external;                               //
+    function getPairLiquidity ()                                 external view returns (uint256, uint8); //
+    function getUserLiquidity (uint256 ownerPubKey)              external view returns (uint256, uint8); //
+    function getUserTotalLiquidity ()                            external view returns (uint256, uint8); //
 
     function getPrice  (address RTW_ofTokenToGet, address RTW_ofTokenToGive, uint128 amountToGive) external view returns (uint256, uint8);
     function swapTokens(address tokenToGet, address tokenToGive, uint128 amountToGive) external;
@@ -107,6 +113,10 @@ interface ISymbolPair
     // Callbacks
     function callbackDeployEmptyWallet(address newWalletAddress, uint128 grams, uint256 walletPublicKey, address ownerAddress) external;
     function callbackSendTokensWithResolve(uint errorCode, uint128 tokens, uint128 grams, uint256 pubKeyToResolve) external;
+    function callbackSwapGetTTWAddress(address targetAddress, uint256 walletPublicKey, address ownerAddress) external;
+    function callbackSwapGetTransferResult(uint errorCode, uint128 tokens, address to) external;
+    function callbackDepositGetTTWAddress(address targetAddress, uint256 walletPublicKey, address ownerAddress) external;
+    function callbackDepositGetTransferResult(uint errorCode, uint128 tokens, address to) external;
 }
 
 //================================================================================
