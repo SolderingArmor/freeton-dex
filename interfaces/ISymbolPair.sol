@@ -95,13 +95,14 @@ interface ISymbolPair
     //========================================
     // Liquidity
     function getPairRatio(bool firstFirst)                                            external view returns (uint256, uint8); // Returns current pool ratio and decimals, is needed to perform correct "depositLiquidity";
-    function depositLiquidity (uint128 amount1, uint128 amount2)                      external returns(manageLiquidityStatus);                               // ORDER MATTERS
-    function withdrawLiquidity(uint128 amountLiquidity, address crystalWalletAddress) external;                               //
+    function depositLiquidity (uint128 amount1, uint128 amount2)                      external returns(manageLiquidityStatus);                               // ORDER OF SYMBOLS MATTERS
+    function withdrawLiquidity(uint256 amountLiquidity, address crystalWalletAddress) external;                               //
     function getPairLiquidity ()                                                      external view returns (uint256, uint8); //
     function getUserLiquidity (uint256 ownerPubKey)                                   external view returns (uint256, uint8); //
+    function getUserTotalLiquidity ()                                                 external view returns (uint256, uint8); //
 
     function getPrice  (address RTW_ofTokenToGet, address RTW_ofTokenToGive, uint128 amountToGive) external view returns (uint256, uint8);
-    function swapTokens(address tokenToGet, address tokenToGive, uint256 owner) external;
+    function swapTokens(address tokenToGet, address tokenToGive, uint128 amountToGive) external;
 
     // Callbacks
     function callbackDeployEmptyWallet(address newWalletAddress, uint128 grams, uint256 walletPublicKey, address ownerAddress) external;

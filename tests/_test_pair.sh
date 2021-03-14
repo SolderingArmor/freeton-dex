@@ -29,8 +29,8 @@ echo "==========================================================================
 echo "depositLiquidity"
 echo "===================================================================================================="
 tonos-cli -u $NETWORK call $PAIR_ADDRESS depositLiquidity '{"amount1":"40000000000000", "amount2":"1234000000000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
-#tonos-cli -u $NETWORK call $PAIR_ADDRESS depositLiquidity '{"amount1":"40000000000000", "amount2":"123400000000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE
-#tonos-cli -u $NETWORK call $PAIR_ADDRESS depositLiquidity '{"amount1":"76234876324866", "amount2":"12344563456000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE
+#tonos-cli -u $NETWORK call $PAIR_ADDRESS depositLiquidity '{"amount1":"40000000000000", "amount2":"123400000000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
+#tonos-cli -u $NETWORK call $PAIR_ADDRESS depositLiquidity '{"amount1":"76234876324866", "amount2":"12344563456000000"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
 
 echo "===================================================================================================="
 echo "getPairRatio"
@@ -41,5 +41,16 @@ tonos-cli -u $NETWORK run $PAIR_ADDRESS getPairRatio '{"firstFirst":"false"}' --
 echo "===================================================================================================="
 echo "getPairLiquidity"
 echo "===================================================================================================="
-tonos-cli -u $NETWORK run $PAIR_ADDRESS getPairLiquidity '{}' --abi ../contracts/SymbolPair.abi.json | awk '/Result: {/,/}/'
+tonos-cli -u $NETWORK run $PAIR_ADDRESS getUserTotalLiquidity '{}' --abi ../contracts/SymbolPair.abi.json | awk '/Result: {/,/}/'
+tonos-cli -u $NETWORK run $PAIR_ADDRESS getUserLiquidity '{"ownerPubKey":"0x'$PUBKEY1'"}' --abi ../contracts/SymbolPair.abi.json | awk '/Result: {/,/}/'
 
+echo "===================================================================================================="
+echo "withdrawLiquidity"
+echo "===================================================================================================="
+tonos-cli -u $NETWORK call $PAIR_ADDRESS withdrawLiquidity '{"amountLiquidity":"40000000000000000000", "crystalWalletAddress":"'$ZERO_ADDRESS'"}' --abi ../contracts/SymbolPair.abi.json --sign $KEYS1_FILE | awk '/Result: {/,/}/'
+
+echo "===================================================================================================="
+echo "getPairLiquidity"
+echo "===================================================================================================="
+tonos-cli -u $NETWORK run $PAIR_ADDRESS getUserTotalLiquidity '{}' --abi ../contracts/SymbolPair.abi.json | awk '/Result: {/,/}/'
+tonos-cli -u $NETWORK run $PAIR_ADDRESS getUserLiquidity '{"ownerPubKey":"0x'$PUBKEY1'"}' --abi ../contracts/SymbolPair.abi.json | awk '/Result: {/,/}/'

@@ -17,7 +17,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     // Constants
     address constant addressZero      = address.makeAddrNone(); // 
     uint256 constant minimumLiquidity = 10**3;                  //
-    uint256 public   _totalLiquidity  = 0; // here it's the sum of all user liquidities, times 10**_localDecimals
+    uint256 public  _totalLiquidity   = 0; // here it's the sum of all user liquidities, times 10**_localDecimals
     
     // Errors
     uint constant ERROR_SENDER_IS_NOT_MY_FACTORY            = 200;
@@ -32,7 +32,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
     bool    public  _feeIsCustom   = false; // Custom fee for this Symbol Pair; when Factory changes the fee and this is "false", custom value stays intact;
     uint16  public  _currentFee    = 30;    // Current fee for Liquidity Providers to earn; Default 0.3%;  
-    uint8   private _localDecimals = 9;  
+    uint8   private _localDecimals = 18;  
 
     //========================================
     // Events
@@ -48,18 +48,10 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
     //========================================
     // Mappings
-    mapping(uint256 => uint256)      _userLiquidity;   // (PubKey => LiquidityTokens number) mapping, amount that was provided by users;
-    /*mapping(uint256 => StateMachine) _depositStatuses; // Action 0: deposit symbol1 (is filled out after 1st callback)
-                                                       // Action 1: deposit symbol2 (is filled out after 2nd callback)
-                                                       // Action 2: check the ratio and fulfill the order (is filled out after 2nd callback + Action 1)
-                                                       // when there's an error - rollback everything;
-    mapping(uint256 => StateMachine) _swapStatuses;    // Action 0: receive symbol from the TTW (is filled out after 1st callback)
-                                                       // Action 1: check the ratio and fulfill the order (is filled out after 1st callback + Action 0)
-                                                       // Action 2: [empty]
-                                                       // when there's an error - rollback everything;*/
-    mapping(uint256 => manageLiquidityStatus)  _depositLiquidityStatus;
-    mapping(uint256 => manageLiquidityStatus) _withdrawLiquidityStatus;
-    mapping(uint256 => swapTokenStatus)       _swapTokenStatus;
+    mapping(uint256 => uint256)               _userLiquidity;           // (PubKey => LiquidityTokens number) mapping, amount that was provided by users;
+    mapping(uint256 => manageLiquidityStatus) _depositLiquidityStatus;  //
+    mapping(uint256 => manageLiquidityStatus) _withdrawLiquidityStatus; //
+    mapping(uint256 => swapTokenStatus)       _swapTokenStatus;         //
     
     
 
@@ -171,7 +163,6 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
             //
             uint256 amount2from1 = (uint256(amount1) * 10**uint256(_localDecimals));
                     amount2from1 /= ratio;
-            //uint8 newPrecision2 = _symbol1.decimals + _localDecimals - ratioDecimals;
             uint8 newPrecision2 = _symbol1.decimals + ratioDecimals - _localDecimals;
             if(_symbol2.decimals > newPrecision2)
             {
@@ -188,7 +179,6 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
             uint256 amount1from2 = (uint256(amount2) * 10**uint256(_localDecimals));
                     amount1from2 /= ratioReverse;
-            //uint8 newPrecision1 = _symbol2.decimals + _localDecimals - ratioReverseDecimals;
             uint8 newPrecision1 = _symbol2.decimals + ratioReverseDecimals - _localDecimals;
             if(_symbol1.decimals > newPrecision1)
             {
@@ -223,10 +213,45 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
         _depositLiquidityStatus[msg.pubkey()].symbol2Processed = 0;
         _depositLiquidityStatus[msg.pubkey()].symbol2Error     = 0;
 
+        // ONLY FOR TESTING!
         // TODO: CHANGE:
+        // TODO: ADD USER LIQUIDITY
+        // Liquidity provided is calculated based on _symbol1 ratio;
+        
+        uint256 liquidityRatio = 0;
+        uint256 newLiquidity   = 0;
+        if(_symbol1.amount == 0)
+        {
+            if(_localDecimals >= _symbol1.decimals)
+            {
+                newLiquidity = finalAmount1 * 10**(uint256(_localDecimals - _symbol1.decimals));
+            }
+            else
+            {
+                newLiquidity = finalAmount1 / 10**(uint256(_symbol1.decimals - _localDecimals));
+            }
+
+            _userLiquidity[msg.pubkey()] = newLiquidity;
+            _totalLiquidity = newLiquidity;            
+        }
+        else
+        {
+            liquidityRatio = (_symbol1.amount * 10**uint256(_localDecimals)) / finalAmount1;
+            newLiquidity    = _totalLiquidity * 10**uint256(_localDecimals) / liquidityRatio;
+            
+            _userLiquidity[msg.pubkey()] += newLiquidity;
+            _totalLiquidity += newLiquidity;
+        }
+        
         _symbol1.amount += finalAmount1;
         _symbol2.amount += finalAmount2;
 
+
+
+        //uint256 ratio = (_totalLiquidity * 10**uint256(_localDecimals)) / uint256(amountLiquidity);
+        //uint256 liquidityChange = uint256(finalAmount1) * uint256(finalAmount2);
+        //_totalLiquidity += liquidityChange;
+        //_userLiquidity[msg.pubkey()] += liquidityChange;
 
         manageLiquidityStatus kek = _depositLiquidityStatus[msg.pubkey()];
         delete _depositLiquidityStatus[msg.pubkey()];
@@ -237,22 +262,22 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     //========================================
     // TODO: Current limitations: only Public Key owners can deposit and withdraw liquidity;
     //       their TIP-3 address will be calculated from their Public Key;
-    function withdrawLiquidity(uint128 amountLiquidity, address crystalWalletAddress) external override 
+    function withdrawLiquidity(uint256 amountLiquidity, address crystalWalletAddress) external override 
     {
-        require(msg.sender == addressZero,                       5555);
-        require(amountLiquidity > 0,                             5555);
-        require(_userLiquidity[msg.pubkey()] >= amountLiquidity, 5555);
+        require(msg.pubkey() != 0,                               5555);
+        require(amountLiquidity > 0,                             5556);
+        require(_userLiquidity[msg.pubkey()] >= amountLiquidity, 5557);
 
         tvm.accept();
 
-        // OUR _totalLiquidity       has _localDecimals precision
-        //     _userLiquidity[] also has _localDecimals precision
-        // We purposely multiply all the values by 10**9 to have better precision when dividing to get ratio;
+        // OUR _totalLiquidity       has "_symbol1.decimals + _symbol2.decimals" precision
+        //     _userLiquidity[] also has "_symbol1.decimals + _symbol2.decimals" precision
+        // We purposely multiply all the values by "10**_localDecimals" to have better precision when dividing to get ratio;
         // About every Symbol custom precision - we do not need to care about it;
 
-        uint256 ratio = (_totalLiquidity * 10**uint256(_localDecimals)) / amountLiquidity;
-        uint256 amountSymbol1 = (_symbol1.amount * 10**uint256(_localDecimals)) / ratio;    amountSymbol1 /= 10**uint256(_localDecimals); // no need for extra precision anymore;
-        uint256 amountSymbol2 = (_symbol2.amount * 10**uint256(_localDecimals)) / ratio;    amountSymbol2 /= 10**uint256(_localDecimals); // no need for extra precision anymore;
+        uint256 ratio = (_totalLiquidity * 10**uint256(_localDecimals)) / uint256(amountLiquidity);
+        uint256 amountSymbol1 = (uint256(_symbol1.amount) * 10**uint256(_localDecimals)) / ratio;    amountSymbol1 /= 10**uint256(_localDecimals); // no need for extra precision anymore;
+        uint256 amountSymbol2 = (uint256(_symbol2.amount) * 10**uint256(_localDecimals)) / ratio;    amountSymbol2 /= 10**uint256(_localDecimals); // no need for extra precision anymore;
 
         // Symbol1
         //if(_symbol1.symbolType == SymbolType.TonCrystal) {    crystalWalletAddress.transfer(uint128(amountSymbol1), true, 0);    } // TODO: revisit flag 0
@@ -277,8 +302,9 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
     function getPairLiquidity() public view override returns (uint256, uint8) 
     {
-        uint256 amount  = _symbol1.amount   * _symbol2.amount;
-        uint8  decimals = _symbol1.decimals + _symbol2.decimals;
+        uint256 amount   = _symbol1.amount   * _symbol2.amount;
+        uint8   decimals = _symbol1.decimals + _symbol2.decimals;
+
         return (amount, decimals);
     }
 
@@ -286,8 +312,14 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     //
     function getUserLiquidity(uint256 ownerPubKey) external view override returns (uint256, uint8) 
     {
-        // TODO: decimals?
+        //uint8 decimals = _symbol1.decimals + _symbol2.decimals;
         return (_userLiquidity[ownerPubKey], _localDecimals);
+    }
+
+    function getUserTotalLiquidity() external view override returns (uint256, uint8)
+    {
+        //uint8 decimals = _symbol1.decimals + _symbol2.decimals;
+        return (_totalLiquidity, _localDecimals);
     }
 
     //========================================
@@ -332,7 +364,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
     //========================================
     // TODO: need to add "maximum slippage" to prevent a Liquidity provider to provide Liquidity having a bad ratio
-    function swapTokens(address tokenToGet, address tokenToGive, uint256 owner) external override
+    function swapTokens(address tokenToGet, address tokenToGive, uint128 amountToGive) external override
     {
         (uint256 liquidity, uint8 decimals) = getPairLiquidity();
         require(minimumLiquidity * 10**uint256(decimals) < liquidity, 111);
