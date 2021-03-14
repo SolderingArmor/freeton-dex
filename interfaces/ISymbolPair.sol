@@ -28,7 +28,32 @@ struct Symbol
 
 //================================================================================
 // 
-struct StateMachineAction
+struct manageLiquidityStatus // both deposit and withdraw
+{
+    uint32  dtRequested;
+    uint128 symbol1Requested;
+    uint128 symbol1ToProcess;
+    uint128 symbol1Processed;
+    uint    symbol1Error;
+    uint128 symbol2Requested;
+    uint128 symbol2ToProcess;
+    uint128 symbol2Processed;
+    uint    symbol2Error;
+}
+
+struct swapTokenStatus
+{
+    uint32  dtRequested;
+    bool    direction;        // true means "get symbol1 and give symbol2", false means "give symbol1 and get symbol2"
+    uint128 symbol1Requested;
+    uint128 symbol1Processed;
+    uint    symbol1Error;
+    uint128 symbol2Requested;
+    uint128 symbol2Processed;
+    uint    symbol2Error;
+}
+
+/*struct StateMachineAction
 {
     //uint128 amount;
     bool    processed;
@@ -46,7 +71,7 @@ struct StateMachine
     uint8   currentAction;
     uint    errorCode;
     bool    done;
-}
+}*/
 
 //================================================================================
 //
@@ -70,7 +95,7 @@ interface ISymbolPair
     //========================================
     // Liquidity
     function getPairRatio(bool firstFirst)                                            external view returns (uint256, uint8); // Returns current pool ratio and decimals, is needed to perform correct "depositLiquidity";
-    function depositLiquidity (uint128 amount1, uint128 amount2)                      external;                               // ORDER MATTERS
+    function depositLiquidity (uint128 amount1, uint128 amount2)                      external returns(manageLiquidityStatus);                               // ORDER MATTERS
     function withdrawLiquidity(uint128 amountLiquidity, address crystalWalletAddress) external;                               //
     function getPairLiquidity ()                                                      external view returns (uint256, uint8); //
     function getUserLiquidity (uint256 ownerPubKey)                                   external view returns (uint256, uint8); //
@@ -80,6 +105,7 @@ interface ISymbolPair
 
     // Callbacks
     function callbackDeployEmptyWallet(address newWalletAddress, uint128 grams, uint256 walletPublicKey, address ownerAddress) external;
+    function callbackSendTokensWithResolve(uint errorCode, uint128 tokens, uint128 grams, uint256 pubKeyToResolve) external;
 }
 
 //================================================================================

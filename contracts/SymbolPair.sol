@@ -16,7 +16,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 {
     // Constants
     address constant addressZero      = address.makeAddrNone(); // 
-    uint256 constant minimumLiquidity = 10^3;                   //
+    uint256 constant minimumLiquidity = 10**3;                  //
     uint256 public   _totalLiquidity  = 0; // here it's the sum of all user liquidities, times 10**_localDecimals
     
     // Errors
@@ -32,7 +32,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
     bool    public  _feeIsCustom   = false; // Custom fee for this Symbol Pair; when Factory changes the fee and this is "false", custom value stays intact;
     uint16  public  _currentFee    = 30;    // Current fee for Liquidity Providers to earn; Default 0.3%;  
-    uint8   private _localDecimals = 18;  
+    uint8   private _localDecimals = 9;  
 
     //========================================
     // Events
@@ -49,14 +49,19 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     //========================================
     // Mappings
     mapping(uint256 => uint256)      _userLiquidity;   // (PubKey => LiquidityTokens number) mapping, amount that was provided by users;
-    mapping(uint256 => StateMachine) _depositStatuses; // Action 0: deposit symbol1 (is filled out after 1st callback)
+    /*mapping(uint256 => StateMachine) _depositStatuses; // Action 0: deposit symbol1 (is filled out after 1st callback)
                                                        // Action 1: deposit symbol2 (is filled out after 2nd callback)
                                                        // Action 2: check the ratio and fulfill the order (is filled out after 2nd callback + Action 1)
                                                        // when there's an error - rollback everything;
     mapping(uint256 => StateMachine) _swapStatuses;    // Action 0: receive symbol from the TTW (is filled out after 1st callback)
                                                        // Action 1: check the ratio and fulfill the order (is filled out after 1st callback + Action 0)
                                                        // Action 2: [empty]
-                                                       // when there's an error - rollback everything;
+                                                       // when there's an error - rollback everything;*/
+    mapping(uint256 => manageLiquidityStatus)  _depositLiquidityStatus;
+    mapping(uint256 => manageLiquidityStatus) _withdrawLiquidityStatus;
+    mapping(uint256 => swapTokenStatus)       _swapTokenStatus;
+    
+    
 
     //========================================
     //
@@ -72,6 +77,16 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
         if(msg.sender == _symbol2.symbolRTW) {    _symbol2.symbolTTW = newWalletAddress;    return;    } 
     }
 
+    /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
+    ///      Error: Undeclared identifier. "callbackSendTokensWithResolve" is not (or not yet) visible at this point.
+    ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
+    function callbackSendTokensWithResolve(uint errorCode, uint128 tokens, uint128 grams, uint256 pubKeyToResolve) public override 
+    {
+
+    }
+
+    //========================================
+    //
     constructor() public onlyFactory
     {        
         tvm.accept();
@@ -99,52 +114,129 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     
     //========================================
     // 
-    function getPairRatio(bool firstFirst) external view override returns (uint256, uint8)
+    /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
+    ///      Error: Undeclared identifier. "getPairRatio" is not (or not yet) visible at this point.
+    ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
+    function getPairRatio(bool firstFirst) public view override returns (uint256, uint8)
     {
         Symbol symbol1 = firstFirst ? _symbol1 : _symbol2;
         Symbol symbol2 = firstFirst ? _symbol2 : _symbol1;
-
-        uint256 ratio    = symbol1.amount;
-        uint8   decimals = 0;
 
         // Empty
         if(symbol1.amount == 0 || symbol2.amount == 0)
         {
             return (0, 0);
         }
+        
+        uint256 ratio    = symbol1.amount;
+        uint8   decimals = _localDecimals + symbol2.decimals - symbol1.decimals;
 
-        if(symbol1.decimals >= symbol2.decimals)
-        {
-            decimals = _localDecimals - (symbol1.decimals - symbol2.decimals);
-        }
-        else 
-        {
-            decimals = _localDecimals + (symbol2.decimals - symbol1.decimals);
-        }
-
-        ratio *= (10^decimals);
-        ratio /= symbol2.amount;
+        ratio = ratio * uint256(10**uint256(_localDecimals));
+        ratio = ratio / uint256(symbol2.amount);
 
         return (ratio, decimals);
     }
 
     //========================================
-    //
-    function depositLiquidity(uint128 amount1, uint128 amount2) external override
+    // TODO: need to add "maximum slippage" to prevent a Liquidity provider to provide Liquidity having a bad ratio
+    function depositLiquidity(uint128 amount1, uint128 amount2) external override returns(manageLiquidityStatus)
     {
-        (uint256 ratio, uint8 decimals) = getPairRatio();
+        tvm.accept();
+
+        // Check if this user has unfinished deposits
+        if(_depositLiquidityStatus[msg.pubkey()].dtRequested != 0)
+        {
+            if(now - _depositLiquidityStatus[msg.pubkey()].dtRequested <= 600) // we give it 10 minutes to process
+            {
+                require(false, 5555);
+            }
+            else
+            {
+                delete _depositLiquidityStatus[msg.pubkey()];
+            }
+        }
+
+        uint128 finalAmount1 = 0;
+        uint128 finalAmount2 = 0;
+
+        (uint256 ratio, uint8 ratioDecimals) = getPairRatio(true);
         if(ratio == 0)
         {
-
+            finalAmount1 = amount1;
+            finalAmount2 = amount2;
         }
         else
         {
-            
+            //========================================
+            //
+            uint256 amount2from1 = (uint256(amount1) * 10**uint256(_localDecimals));
+                    amount2from1 /= ratio;
+            //uint8 newPrecision2 = _symbol1.decimals + _localDecimals - ratioDecimals;
+            uint8 newPrecision2 = _symbol1.decimals + ratioDecimals - _localDecimals;
+            if(_symbol2.decimals > newPrecision2)
+            {
+                amount2from1 = amount2from1 * 10**uint256(_symbol2.decimals - newPrecision2);
+            }
+            else
+            {
+                amount2from1 = amount2from1 / 10**uint256(newPrecision2 - _symbol2.decimals);
+            }
+
+            //========================================
+            //
+            (uint256 ratioReverse, uint8 ratioReverseDecimals) = getPairRatio(false);
+
+            uint256 amount1from2 = (uint256(amount2) * 10**uint256(_localDecimals));
+                    amount1from2 /= ratioReverse;
+            //uint8 newPrecision1 = _symbol2.decimals + _localDecimals - ratioReverseDecimals;
+            uint8 newPrecision1 = _symbol2.decimals + ratioReverseDecimals - _localDecimals;
+            if(_symbol1.decimals > newPrecision1)
+            {
+                amount1from2 = amount1from2 * 10**uint256(_symbol1.decimals - newPrecision1);
+            }
+            else
+            {
+                amount1from2 = amount1from2 / 10**uint256(newPrecision1 - _symbol1.decimals);
+            }
+
+            //========================================
+            //
+            if(amount2from1 <= uint256(amount2))
+            {
+                finalAmount1 = amount1;
+                finalAmount2 = uint128(amount2from1);
+            }
+            else
+            {
+                finalAmount1 = uint128(amount1from2);
+                finalAmount2 = amount2;
+            }
         }
+
+        _depositLiquidityStatus[msg.pubkey()].dtRequested      = now;
+        _depositLiquidityStatus[msg.pubkey()].symbol1Requested = amount1;
+        _depositLiquidityStatus[msg.pubkey()].symbol1ToProcess = finalAmount1;
+        _depositLiquidityStatus[msg.pubkey()].symbol1Processed = 0;
+        _depositLiquidityStatus[msg.pubkey()].symbol1Error     = 0;
+        _depositLiquidityStatus[msg.pubkey()].symbol2Requested = amount2;
+        _depositLiquidityStatus[msg.pubkey()].symbol2ToProcess = finalAmount2;
+        _depositLiquidityStatus[msg.pubkey()].symbol2Processed = 0;
+        _depositLiquidityStatus[msg.pubkey()].symbol2Error     = 0;
+
+        // TODO: CHANGE:
+        _symbol1.amount += finalAmount1;
+        _symbol2.amount += finalAmount2;
+
+
+        manageLiquidityStatus kek = _depositLiquidityStatus[msg.pubkey()];
+        delete _depositLiquidityStatus[msg.pubkey()];
+
+        return (kek);
     }
 
     //========================================
-    //
+    // TODO: Current limitations: only Public Key owners can deposit and withdraw liquidity;
+    //       their TIP-3 address will be calculated from their Public Key;
     function withdrawLiquidity(uint128 amountLiquidity, address crystalWalletAddress) external override 
     {
         require(msg.sender == addressZero,                       5555);
@@ -155,25 +247,25 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
         // OUR _totalLiquidity       has _localDecimals precision
         //     _userLiquidity[] also has _localDecimals precision
-        // We purposely multiply all the values by 10^9 to have better precision when dividing to get ratio;
+        // We purposely multiply all the values by 10**9 to have better precision when dividing to get ratio;
         // About every Symbol custom precision - we do not need to care about it;
 
-        uint8 decimals = 9;
-        uint256 ratio = (_totalLiquidity * 10^decimals) / amountLiquidity;
-        uint256 amountSymbol1 = (_symbol1.amount * 10^decimals) / ratio;    amountSymbol1 /= 10^decimals; // no need for extra precision anymore;
-                
-        uint256 amountSymbol2 = (_symbol2.amount * 10^decimals) / ratio;    amountSymbol2 /= 10^decimals; // no need for extra precision anymore;
+        uint256 ratio = (_totalLiquidity * 10**uint256(_localDecimals)) / amountLiquidity;
+        uint256 amountSymbol1 = (_symbol1.amount * 10**uint256(_localDecimals)) / ratio;    amountSymbol1 /= 10**uint256(_localDecimals); // no need for extra precision anymore;
+        uint256 amountSymbol2 = (_symbol2.amount * 10**uint256(_localDecimals)) / ratio;    amountSymbol2 /= 10**uint256(_localDecimals); // no need for extra precision anymore;
 
         // Symbol1
         //if(_symbol1.symbolType == SymbolType.TonCrystal) {    crystalWalletAddress.transfer(uint128(amountSymbol1), true, 0);    } // TODO: revisit flag 0
-        //if(_symbol1.symbolType == SymbolType.Tip3)       {    ITonTokenWallet(_symbol1.symbolTTW).sendTokensResolveAddressZPK{value: 1 ton, callback: 000}(uint128(amountSymbol1), 1, msg.pubkey());  }
+        //if(_symbol1.symbolType == SymbolType.Tip3)       {    ITonTokenWallet(_symbol1.symbolTTW).sendTokensResolveAddressZPK{value: 1 ton, callback: callbackSendTokensWithResolve}(uint128(amountSymbol1), 1 ton, msg.pubkey());  }
         //if(_symbol1.symbolType == SymbolType.Erc20)      { } // CURENTLY NOT IMPLEMENTED
 
         // Symbol2
         //if(_symbol2.symbolType == SymbolType.TonCrystal) {    crystalWalletAddress.transfer(uint128(amountSymbol2), true, 0);    } // TODO: revisit flag 0
-        //if(_symbol2.symbolType == SymbolType.Tip3)       {    ITonTokenWallet(_symbol2.symbolTTW).sendTokensResolveAddressZPK{value: 1 ton, callback: 000}(uint128(amountSymbol1), 1, msg.pubkey());  }
+        //if(_symbol2.symbolType == SymbolType.Tip3)       {    ITonTokenWallet(_symbol2.symbolTTW).sendTokensResolveAddressZPK{value: 1 ton, callback: callbackSendTokensWithResolve}(uint128(amountSymbol2), 1 ton, msg.pubkey());  }
         //if(_symbol2.symbolType == SymbolType.Erc20)      { } // CURENTLY NOT IMPLEMENTED
 
+        _symbol1.amount              -= amountSymbol1;
+        _symbol2.amount              -= amountSymbol2;
         _totalLiquidity              -= amountLiquidity;
         _userLiquidity[msg.pubkey()] -= amountLiquidity;
 
@@ -232,18 +324,18 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
         else 
         {
             uint8 pow = symbolGive.decimals - symbolGet.decimals;
-            tokensToBuy = tokensToBuy * (10^pow);
+            tokensToBuy = tokensToBuy * (10**uint256(pow));
         }
 
         return (tokensToBuy, decimals);
     }
 
     //========================================
-    //
+    // TODO: need to add "maximum slippage" to prevent a Liquidity provider to provide Liquidity having a bad ratio
     function swapTokens(address tokenToGet, address tokenToGive, uint256 owner) external override
     {
         (uint256 liquidity, uint8 decimals) = getPairLiquidity();
-        require(minimumLiquidity * 10^decimals < liquidity, 111);
+        require(minimumLiquidity * 10**uint256(decimals) < liquidity, 111);
 
         // TODO
     }
