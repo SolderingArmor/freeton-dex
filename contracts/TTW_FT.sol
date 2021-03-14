@@ -313,7 +313,6 @@ contract TonTokenWallet is ITonTokenWallet
         return{value: 0, flag: 64}(errorCode, tokens, to);
     }
 
-
     //========================================
     //========================================
     //========================================

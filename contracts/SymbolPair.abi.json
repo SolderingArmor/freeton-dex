@@ -1,0 +1,238 @@
+{
+	"ABI version": 2,
+	"header": ["pubkey", "time", "expire"],
+	"functions": [
+		{
+			"name": "constructor",
+			"inputs": [
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "callbackDeployEmptyWallet",
+			"inputs": [
+				{"name":"newWalletAddress","type":"address"},
+				{"name":"grams","type":"uint128"},
+				{"name":"walletPublicKey","type":"uint256"},
+				{"name":"ownerAddress","type":"address"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "callbackSendTokensWithResolve",
+			"inputs": [
+				{"name":"errorCode","type":"uint256"},
+				{"name":"tokens","type":"uint128"},
+				{"name":"grams","type":"uint128"},
+				{"name":"pubKeyToResolve","type":"uint256"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "callbackSwapGetTTWAddress",
+			"inputs": [
+				{"name":"targetAddress","type":"address"},
+				{"name":"walletPublicKey","type":"uint256"},
+				{"name":"ownerAddress","type":"address"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "callbackSwapGetTransferResult",
+			"inputs": [
+				{"name":"errorCode","type":"uint256"},
+				{"name":"tokens","type":"uint128"},
+				{"name":"to","type":"address"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "callbackDepositGetTTWAddress",
+			"inputs": [
+				{"name":"targetAddress","type":"address"},
+				{"name":"walletPublicKey","type":"uint256"},
+				{"name":"ownerAddress","type":"address"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "callbackDepositGetTransferResult2",
+			"inputs": [
+				{"name":"errorCode","type":"uint256"},
+				{"name":"tokens","type":"uint128"},
+				{"name":"to","type":"address"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "callbackDepositGetTransferResult",
+			"inputs": [
+				{"name":"errorCode","type":"uint256"},
+				{"name":"tokens","type":"uint128"},
+				{"name":"to","type":"address"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "setProviderFee",
+			"inputs": [
+				{"name":"fee","type":"uint16"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "setCustomProviderFee",
+			"inputs": [
+				{"name":"isCustom","type":"bool"},
+				{"name":"fee","type":"uint16"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "getPairRatio",
+			"inputs": [
+				{"name":"firstFirst","type":"bool"}
+			],
+			"outputs": [
+				{"name":"value0","type":"uint256"},
+				{"name":"value1","type":"uint8"}
+			]
+		},
+		{
+			"name": "depositLiquidity",
+			"inputs": [
+				{"name":"amount1","type":"uint128"},
+				{"name":"amount2","type":"uint128"},
+				{"name":"ttwToken1","type":"address"},
+				{"name":"ttwToken2","type":"address"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "withdrawLiquidity",
+			"inputs": [
+				{"name":"amountLiquidity","type":"uint256"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "getPairLiquidity",
+			"inputs": [
+			],
+			"outputs": [
+				{"name":"value0","type":"uint256"},
+				{"name":"value1","type":"uint8"}
+			]
+		},
+		{
+			"name": "getUserLiquidity",
+			"inputs": [
+				{"name":"ownerPubKey","type":"uint256"}
+			],
+			"outputs": [
+				{"name":"value0","type":"uint256"},
+				{"name":"value1","type":"uint8"}
+			]
+		},
+		{
+			"name": "getUserTotalLiquidity",
+			"inputs": [
+			],
+			"outputs": [
+				{"name":"value0","type":"uint256"},
+				{"name":"value1","type":"uint8"}
+			]
+		},
+		{
+			"name": "getPrice",
+			"inputs": [
+				{"name":"RTW_ofTokenToGet","type":"address"},
+				{"name":"RTW_ofTokenToGive","type":"address"},
+				{"name":"amountToGive","type":"uint128"}
+			],
+			"outputs": [
+				{"name":"value0","type":"uint256"},
+				{"name":"value1","type":"uint8"}
+			]
+		},
+		{
+			"name": "swapTokens",
+			"inputs": [
+				{"name":"tokenToGet","type":"address"},
+				{"name":"tokenToGive","type":"address"},
+				{"name":"amountToGive","type":"uint128"},
+				{"name":"ttwTokenToGet","type":"address"},
+				{"name":"ttwTokenToGive","type":"address"}
+			],
+			"outputs": [
+			]
+		},
+		{
+			"name": "_totalLiquidity",
+			"inputs": [
+			],
+			"outputs": [
+				{"name":"_totalLiquidity","type":"uint256"}
+			]
+		},
+		{
+			"name": "_factoryAddress",
+			"inputs": [
+			],
+			"outputs": [
+				{"name":"_factoryAddress","type":"address"}
+			]
+		},
+		{
+			"name": "_symbol1",
+			"inputs": [
+			],
+			"outputs": [
+				{"components":[{"name":"symbolType","type":"uint8"},{"name":"symbolRTW","type":"address"},{"name":"symbolTTW","type":"address"},{"name":"name","type":"bytes"},{"name":"symbol","type":"bytes"},{"name":"decimals","type":"uint8"},{"name":"amount","type":"uint256"}],"name":"_symbol1","type":"tuple"}
+			]
+		},
+		{
+			"name": "_symbol2",
+			"inputs": [
+			],
+			"outputs": [
+				{"components":[{"name":"symbolType","type":"uint8"},{"name":"symbolRTW","type":"address"},{"name":"symbolTTW","type":"address"},{"name":"name","type":"bytes"},{"name":"symbol","type":"bytes"},{"name":"decimals","type":"uint8"},{"name":"amount","type":"uint256"}],"name":"_symbol2","type":"tuple"}
+			]
+		},
+		{
+			"name": "_feeIsCustom",
+			"inputs": [
+			],
+			"outputs": [
+				{"name":"_feeIsCustom","type":"bool"}
+			]
+		},
+		{
+			"name": "_currentFee",
+			"inputs": [
+			],
+			"outputs": [
+				{"name":"_currentFee","type":"uint16"}
+			]
+		}
+	],
+	"data": [
+		{"key":1,"name":"_factoryAddress","type":"address"},
+		{"components":[{"name":"symbolType","type":"uint8"},{"name":"symbolRTW","type":"address"},{"name":"symbolTTW","type":"address"},{"name":"name","type":"bytes"},{"name":"symbol","type":"bytes"},{"name":"decimals","type":"uint8"},{"name":"amount","type":"uint256"}],"key":2,"name":"_symbol1","type":"tuple"},
+		{"components":[{"name":"symbolType","type":"uint8"},{"name":"symbolRTW","type":"address"},{"name":"symbolTTW","type":"address"},{"name":"name","type":"bytes"},{"name":"symbol","type":"bytes"},{"name":"decimals","type":"uint8"},{"name":"amount","type":"uint256"}],"key":3,"name":"_symbol2","type":"tuple"}
+	],
+	"events": [
+	]
+}

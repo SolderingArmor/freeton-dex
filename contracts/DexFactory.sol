@@ -195,7 +195,7 @@ contract DexFactory is IDexFactory
         (address symbol1, address symbol2) = _sortAddresses(symbol1RTW, symbol2RTW);
         
         (address desiredAddress, TvmCell stateInit) = calculatePairFutureAddress(symbol1RTW, symbol2RTW);
-        address newPair = new SymbolPair{stateInit: stateInit, value: 10 ton}();
+        address newPair = new SymbolPair{stateInit: stateInit, value: 50 ton}();
         _listPairs[desiredAddress] = true;
     }
 

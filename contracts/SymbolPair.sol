@@ -24,6 +24,10 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     uint constant ERROR_SYMBOLS_SHOULD_BE_DIFFERENT         = 201;
     uint constant ERROR_SYMBOLS_SHOULD_HAVE_VALID_ADDRESSES = 202;
     uint constant ERROR_SYMBOL_MISSING                      = 203;
+    uint constant ERROR_EMPTY_PUBKEY                        = 204;
+    uint constant ERROR_SENDER_IS_NOT_RTW                   = 205;
+    uint constant ERROR_CAN_NOT_WITHDRAW_0_LIQUIDITY        = 206;
+    uint constant ERROR_NOT_ENOUGH_LIQUIDITY                = 207;
     
     // Variables   
     address public static _factoryAddress; //  
@@ -41,8 +45,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     // Modifiers
     modifier onlyFactory
     {
-        // disabled for testing
-        //require(msg.sender == _factoryAddress, ERROR_SENDER_IS_NOT_MY_FACTORY);
+        require(msg.sender == _factoryAddress, ERROR_SENDER_IS_NOT_MY_FACTORY);
         _;
     }
 
@@ -60,7 +63,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
     function callbackDeployEmptyWallet(address newWalletAddress, uint128 grams, uint256 walletPublicKey, address ownerAddress) public override
     {
-        require(msg.sender == _symbol1.symbolRTW || msg.sender == _symbol2.symbolRTW, 5555);
+        require(msg.sender == _symbol1.symbolRTW || msg.sender == _symbol2.symbolRTW, ERROR_SENDER_IS_NOT_RTW);
         tvm.accept();
 
         if(msg.sender == _symbol1.symbolRTW) {    _symbol1.symbolTTW = newWalletAddress;    return;    }
@@ -80,20 +83,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
     function callbackSwapGetTTWAddress(address targetAddress, uint256 walletPublicKey, address ownerAddress) public override 
     {
-        require(msg.sender == _symbol1.symbolRTW || msg.sender == _symbol2.symbolRTW, 5555);
-        tvm.accept();
-        
-        bool direction = _swapTokenStatus[walletPublicKey].direction; // true means "get symbol1 and give symbol2", false means "give symbol1 and get symbol2"
-        if(direction)
-        {
-            _swapTokenStatus[walletPublicKey].symbol2TTW = targetAddress;
-            ITonTokenWallet(targetAddress).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackSwapGetTransferResult}(_swapTokenStatus[walletPublicKey].symbol2Requested, targetAddress);
-        }
-        else
-        {
-            _swapTokenStatus[walletPublicKey].symbol1TTW = targetAddress;
-            ITonTokenWallet(targetAddress).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackSwapGetTransferResult}(_swapTokenStatus[walletPublicKey].symbol1Requested, targetAddress);
-        }
+        // we will purposely do nothing here, just grab our change
     }
 
     /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
@@ -101,6 +91,7 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
     function callbackSwapGetTransferResult(uint errorCode, uint128 tokens, address to) public override 
     {
+        tvm.accept();
         tvm.accept();
         
         uint256 publicKey = 0;
@@ -155,62 +146,178 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
     function callbackDepositGetTTWAddress(address targetAddress, uint256 walletPublicKey, address ownerAddress) public override 
     {
-        require(msg.sender == _symbol1.symbolRTW || msg.sender == _symbol2.symbolRTW, 5555);
-        tvm.accept();
-        
-        if(msg.sender == _symbol1.symbolRTW)
-        {
-            _depositLiquidityStatus[walletPublicKey].symbol1TTW = targetAddress;
-            ITonTokenWallet(targetAddress).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackDepositGetTransferResult}(_depositLiquidityStatus[walletPublicKey].symbol1Requested, targetAddress);
-        }
-        else
-        {
-            _depositLiquidityStatus[walletPublicKey].symbol2TTW = targetAddress;
-            ITonTokenWallet(targetAddress).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackDepositGetTransferResult}(_depositLiquidityStatus[walletPublicKey].symbol2Requested, targetAddress);
-        }
+        // we will purposely do nothing here, just grab our change
     }
 
     /// @dev TODO: here "external" was purposely changed to "public", otherwise you get the following error:
     ///      Error: Undeclared identifier. "callbackSwapGetTransferResult" is not (or not yet) visible at this point.
     ///      The fix is coming: https://github.com/tonlabs/TON-Solidity-Compiler/issues/36
+    function _finalizeLiquidity(uint256 publicKey) internal 
+    {
+        tvm.accept();
+        
+        if(_depositLiquidityStatus[publicKey].symbol1Error > 0 || _depositLiquidityStatus[publicKey].symbol2Error > 0)
+        {
+            _depositLiquidityStatus[publicKey].done = true;
+
+            // return TOKENS BACK!
+            if(_depositLiquidityStatus[publicKey].symbol1ToProcess > 0)
+            {
+                ITonTokenWallet(_symbol1.symbolTTW).sendTokensResolveAddress{value: 0.1 ton}(_depositLiquidityStatus[publicKey].symbol1ToProcess, 0, publicKey);
+            }
+            if(_depositLiquidityStatus[publicKey].symbol2ToProcess > 0)
+            {
+                ITonTokenWallet(_symbol2.symbolTTW).sendTokensResolveAddress{value: 0.1 ton}(_depositLiquidityStatus[publicKey].symbol2ToProcess, 0, publicKey);
+            }
+            
+            return;
+        }
+
+        if(_depositLiquidityStatus[publicKey].symbol1ToProcess > 0 && _depositLiquidityStatus[publicKey].symbol2ToProcess > 0)
+        {
+            // TODO: paste calculations here
+            uint128 finalAmount1 = 0;
+            uint128 finalAmount2 = 0;
+
+            (uint256 ratio, uint8 ratioDecimals) = getPairRatio(true);
+            if(ratio == 0)
+            {
+                finalAmount1 = _depositLiquidityStatus[publicKey].symbol1ToProcess;
+                finalAmount2 = _depositLiquidityStatus[publicKey].symbol2ToProcess;
+            }
+            else
+            {
+                //========================================
+                //
+                uint256 amount2from1 = (uint256(_depositLiquidityStatus[publicKey].symbol1ToProcess) * 10**uint256(_localDecimals));
+                        amount2from1 /= ratio;
+                uint8 newPrecision2 = _symbol1.decimals + ratioDecimals - _localDecimals;
+                if(_symbol2.decimals > newPrecision2)
+                {
+                    amount2from1 = amount2from1 * 10**uint256(_symbol2.decimals - newPrecision2);
+                }
+                else
+                {
+                    amount2from1 = amount2from1 / 10**uint256(newPrecision2 - _symbol2.decimals);
+                }
+
+                //========================================
+                //
+                (uint256 ratioReverse, uint8 ratioReverseDecimals) = getPairRatio(false);
+
+                uint256 amount1from2 = (uint256(_depositLiquidityStatus[publicKey].symbol2ToProcess) * 10**uint256(_localDecimals));
+                        amount1from2 /= ratioReverse;
+                uint8 newPrecision1 = _symbol2.decimals + ratioReverseDecimals - _localDecimals;
+                if(_symbol1.decimals > newPrecision1)
+                {
+                    amount1from2 = amount1from2 * 10**uint256(_symbol1.decimals - newPrecision1);
+                }
+                else
+                {
+                    amount1from2 = amount1from2 / 10**uint256(newPrecision1 - _symbol1.decimals);
+                }
+
+                //========================================
+                //
+                if(amount2from1 <= uint256(_depositLiquidityStatus[publicKey].symbol2ToProcess))
+                {
+                    finalAmount1 = _depositLiquidityStatus[publicKey].symbol1ToProcess;
+                    finalAmount2 = uint128(amount2from1);
+                }
+                else
+                {
+                    finalAmount1 = uint128(amount1from2);
+                    finalAmount2 = _depositLiquidityStatus[publicKey].symbol2ToProcess;
+                }
+            }
+
+            _depositLiquidityStatus[publicKey].symbol1Processed = finalAmount1;
+            _depositLiquidityStatus[publicKey].symbol2Processed = finalAmount2;
+            _depositLiquidityStatus[publicKey].done = true;
+
+            uint256 liquidityRatio = 0;
+            uint256 newLiquidity   = 0;
+            if(_symbol1.amount == 0)
+            {
+                if(_localDecimals >= _symbol1.decimals)
+                {
+                    newLiquidity = finalAmount1 * 10**(uint256(_localDecimals - _symbol1.decimals));
+                }
+                else
+                {
+                    newLiquidity = finalAmount1 / 10**(uint256(_symbol1.decimals - _localDecimals));
+                }
+
+                _userLiquidity[publicKey] = newLiquidity;
+                _totalLiquidity = newLiquidity;            
+            }
+            else
+            {
+                liquidityRatio = (_symbol1.amount * 10**uint256(_localDecimals)) / finalAmount1;
+                newLiquidity    = _totalLiquidity * 10**uint256(_localDecimals) / liquidityRatio;
+                
+                _userLiquidity[publicKey] += newLiquidity;
+                _totalLiquidity += newLiquidity;
+            }
+            
+            _symbol1.amount += finalAmount1;
+            _symbol2.amount += finalAmount2;
+
+            // RETURN CHANGE
+            if(_depositLiquidityStatus[publicKey].symbol1Processed != _depositLiquidityStatus[publicKey].symbol1Requested)
+            {
+                uint128 diff = _depositLiquidityStatus[publicKey].symbol1Requested - _depositLiquidityStatus[publicKey].symbol1Processed;
+                ITonTokenWallet(_symbol1.symbolTTW).sendTokensResolveAddress{value: 0.1 ton}(diff, 0, publicKey);
+            }
+            if(_depositLiquidityStatus[publicKey].symbol2Processed != _depositLiquidityStatus[publicKey].symbol2Requested)
+            {
+                uint128 diff = _depositLiquidityStatus[publicKey].symbol2Requested - _depositLiquidityStatus[publicKey].symbol2Processed;
+                ITonTokenWallet(_symbol2.symbolTTW).sendTokensResolveAddress{value: 0.1 ton}(diff, 0, publicKey);
+            }
+        }
+    }
+
+    function callbackDepositGetTransferResult2(uint errorCode, uint128 tokens, address to) public override 
+    {
+        tvm.accept();
+        
+        for((uint256 pk, manageLiquidityStatus status) : _depositLiquidityStatus)
+        {
+            if(status.symbol2TTW == msg.sender)//  && status.symbol2Requested == tokens)
+            {
+                _depositLiquidityStatus[pk].symbol2ToProcess = tokens;
+                _depositLiquidityStatus[pk].symbol2Error     = errorCode;
+                _finalizeLiquidity(pk);
+                return;
+            }
+        }
+    }
+    
     function callbackDepositGetTransferResult(uint errorCode, uint128 tokens, address to) public override 
     {
         tvm.accept();
         
-        uint256 publicKey = 0;
+        uint256 pubkey = 0;
         for((uint256 pk, manageLiquidityStatus status) : _depositLiquidityStatus)
         {
-            if(status.symbol1TTW == msg.sender && status.symbol1Requested == tokens)
+            if(status.symbol1TTW == msg.sender)// && status.symbol1Requested == tokens)
             {
-                publicKey = pk;
-                _depositLiquidityStatus[pk].symbol1Processed = tokens;
-                _depositLiquidityStatus[pk].symbol1Error     = errorCode;
-                break;
-            }
-            if(status.symbol2TTW == msg.sender && status.symbol2Requested == tokens)
-            {
-                publicKey = pk;
-                _depositLiquidityStatus[pk].symbol2Processed = tokens;
-                _depositLiquidityStatus[pk].symbol2Error     = errorCode;
+                pubkey = pk;
                 break;
             }
         }
-
-        if(_depositLiquidityStatus[publicKey].symbol1Error > 0 || _depositLiquidityStatus[publicKey].symbol2Error > 0)
+        if(pubkey > 0)
         {
-            _depositLiquidityStatus[publicKey].done = true;
-            return;
-        }
+            _depositLiquidityStatus[pubkey].symbol1ToProcess = tokens;
+            _depositLiquidityStatus[pubkey].symbol1Error     = errorCode;
 
-        if(_depositLiquidityStatus[publicKey].symbol1Processed > 0 && _depositLiquidityStatus[publicKey].symbol2Processed > 0)
-        {
-            // TODO: paste calculations here
+            ITonTokenWallet(_depositLiquidityStatus[pubkey].symbol2TTW).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackDepositGetTransferResult2}(_depositLiquidityStatus[pubkey].symbol2Requested, _symbol2.symbolTTW);
         }
     }
 
     //========================================
     //
-    constructor() public onlyFactory
+    constructor() public
     {        
         tvm.accept();
         if(_symbol1.symbolType == SymbolType.Tip3){    IRootTokenWallet(_symbol1.symbolRTW).deployEmptyWalletZPK{value: 2 ton, callback: SymbolPair.callbackDeployEmptyWallet}(2 ton, 0, address(this));    }
@@ -264,127 +371,24 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     // TODO: need to add "maximum slippage" to prevent a Liquidity provider to provide Liquidity having a bad ratio
     // TODO: Current limitations: only Public Key owners can deposit and withdraw liquidity;
     //       their TIP-3 address will be calculated from their Public Key;
-    function depositLiquidity(uint128 amount1, uint128 amount2) external override returns(manageLiquidityStatus)
+    function depositLiquidity(uint128 amount1, uint128 amount2, address ttwToken1, address ttwToken2) external override
     {
         tvm.accept();
 
         // Check if this user has unfinished deposits
         if(_depositLiquidityStatus[msg.pubkey()].dtRequested != 0)
         {
-            if(now - _depositLiquidityStatus[msg.pubkey()].dtRequested <= 60) // we give it 1 minute to process
-            {
-                require(false, 5555);
-            }
-            else
-            {
-                delete _depositLiquidityStatus[msg.pubkey()];
-            }
+            delete _depositLiquidityStatus[msg.pubkey()];
         }
 
-        uint128 finalAmount1 = 0;
-        uint128 finalAmount2 = 0;
-
-        (uint256 ratio, uint8 ratioDecimals) = getPairRatio(true);
-        if(ratio == 0)
-        {
-            finalAmount1 = amount1;
-            finalAmount2 = amount2;
-        }
-        else
-        {
-            //========================================
-            //
-            uint256 amount2from1 = (uint256(amount1) * 10**uint256(_localDecimals));
-                    amount2from1 /= ratio;
-            uint8 newPrecision2 = _symbol1.decimals + ratioDecimals - _localDecimals;
-            if(_symbol2.decimals > newPrecision2)
-            {
-                amount2from1 = amount2from1 * 10**uint256(_symbol2.decimals - newPrecision2);
-            }
-            else
-            {
-                amount2from1 = amount2from1 / 10**uint256(newPrecision2 - _symbol2.decimals);
-            }
-
-            //========================================
-            //
-            (uint256 ratioReverse, uint8 ratioReverseDecimals) = getPairRatio(false);
-
-            uint256 amount1from2 = (uint256(amount2) * 10**uint256(_localDecimals));
-                    amount1from2 /= ratioReverse;
-            uint8 newPrecision1 = _symbol2.decimals + ratioReverseDecimals - _localDecimals;
-            if(_symbol1.decimals > newPrecision1)
-            {
-                amount1from2 = amount1from2 * 10**uint256(_symbol1.decimals - newPrecision1);
-            }
-            else
-            {
-                amount1from2 = amount1from2 / 10**uint256(newPrecision1 - _symbol1.decimals);
-            }
-
-            //========================================
-            //
-            if(amount2from1 <= uint256(amount2))
-            {
-                finalAmount1 = amount1;
-                finalAmount2 = uint128(amount2from1);
-            }
-            else
-            {
-                finalAmount1 = uint128(amount1from2);
-                finalAmount2 = amount2;
-            }
-        }
-
+        // Request depositing
         _depositLiquidityStatus[msg.pubkey()].dtRequested      = now;
+        _depositLiquidityStatus[msg.pubkey()].symbol1TTW       = ttwToken1;
         _depositLiquidityStatus[msg.pubkey()].symbol1Requested = amount1;
-        _depositLiquidityStatus[msg.pubkey()].symbol1ToProcess = finalAmount1;
-        _depositLiquidityStatus[msg.pubkey()].symbol1Processed = 0;
-        _depositLiquidityStatus[msg.pubkey()].symbol1Error     = 0;
+        _depositLiquidityStatus[msg.pubkey()].symbol2TTW       = ttwToken2;
         _depositLiquidityStatus[msg.pubkey()].symbol2Requested = amount2;
-        _depositLiquidityStatus[msg.pubkey()].symbol2ToProcess = finalAmount2;
-        _depositLiquidityStatus[msg.pubkey()].symbol2Processed = 0;
-        _depositLiquidityStatus[msg.pubkey()].symbol2Error     = 0;
 
-
-
-        // ONLY FOR TESTING!
-        // TODO: CHANGE:
-        // TODO: ADD USER LIQUIDITY
-        // Liquidity provided is calculated based on _symbol1 ratio;
-
-        uint256 liquidityRatio = 0;
-        uint256 newLiquidity   = 0;
-        if(_symbol1.amount == 0)
-        {
-            if(_localDecimals >= _symbol1.decimals)
-            {
-                newLiquidity = finalAmount1 * 10**(uint256(_localDecimals - _symbol1.decimals));
-            }
-            else
-            {
-                newLiquidity = finalAmount1 / 10**(uint256(_symbol1.decimals - _localDecimals));
-            }
-
-            _userLiquidity[msg.pubkey()] = newLiquidity;
-            _totalLiquidity = newLiquidity;            
-        }
-        else
-        {
-            liquidityRatio = (_symbol1.amount * 10**uint256(_localDecimals)) / finalAmount1;
-            newLiquidity    = _totalLiquidity * 10**uint256(_localDecimals) / liquidityRatio;
-            
-            _userLiquidity[msg.pubkey()] += newLiquidity;
-            _totalLiquidity += newLiquidity;
-        }
-        
-        _symbol1.amount += finalAmount1;
-        _symbol2.amount += finalAmount2;
-
-        manageLiquidityStatus kek = _depositLiquidityStatus[msg.pubkey()];
-        delete _depositLiquidityStatus[msg.pubkey()];
-
-        return (kek);
+        ITonTokenWallet(ttwToken1).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackDepositGetTransferResult}(amount1, _symbol1.symbolTTW);
     }
 
     //========================================
@@ -392,9 +396,9 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     //       their TIP-3 address will be calculated from their Public Key;
     function withdrawLiquidity(uint256 amountLiquidity) external override 
     {
-        require(msg.pubkey() != 0,                               5555);
-        require(amountLiquidity > 0,                             5556);
-        require(_userLiquidity[msg.pubkey()] >= amountLiquidity, 5557);
+        require(msg.pubkey()   != 0,                             ERROR_EMPTY_PUBKEY                );
+        require(amountLiquidity > 0,                             ERROR_CAN_NOT_WITHDRAW_0_LIQUIDITY);
+        require(_userLiquidity[msg.pubkey()] >= amountLiquidity, ERROR_NOT_ENOUGH_LIQUIDITY        );
 
         tvm.accept();
 
@@ -404,8 +408,8 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
         // About every Symbol custom precision - we do not need to care about it;
 
         uint256 ratio = (_totalLiquidity * 10**uint256(_localDecimals)) / uint256(amountLiquidity);
-        uint256 amountSymbol1 = (uint256(_symbol1.amount) * 10**uint256(_localDecimals)) / ratio;    amountSymbol1 /= 10**uint256(_localDecimals); // 
-        uint256 amountSymbol2 = (uint256(_symbol2.amount) * 10**uint256(_localDecimals)) / ratio;    amountSymbol2 /= 10**uint256(_localDecimals); // 
+        uint256 amountSymbol1 = (uint256(_symbol1.amount) * 10**uint256(_localDecimals)) / ratio;
+        uint256 amountSymbol2 = (uint256(_symbol2.amount) * 10**uint256(_localDecimals)) / ratio;
 
         // Symbol1
         //if(_symbol1.symbolType == SymbolType.TonCrystal) { } // CURENTLY NOT IMPLEMENTED
@@ -440,13 +444,11 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
     //
     function getUserLiquidity(uint256 ownerPubKey) external view override returns (uint256, uint8) 
     {
-        //uint8 decimals = _symbol1.decimals + _symbol2.decimals;
         return (_userLiquidity[ownerPubKey], _localDecimals);
     }
 
     function getUserTotalLiquidity() external view override returns (uint256, uint8)
     {
-        //uint8 decimals = _symbol1.decimals + _symbol2.decimals;
         return (_totalLiquidity, _localDecimals);
     }
 
@@ -482,27 +484,16 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
 
     //========================================
     // TODO: need to add "maximum slippage" to prevent a Liquidity provider to provide Liquidity having a bad ratio
-    function swapTokens(address tokenToGet, address tokenToGive, uint128 amountToGive) external override
+    function swapTokens(address tokenToGet, address tokenToGive, uint128 amountToGive, address ttwTokenToGet, address ttwTokenToGive) external override
     {
-        require(msg.pubkey() != 0, 5555);
+        require(msg.pubkey() != 0, ERROR_EMPTY_PUBKEY);
         
-        (uint256 tmpLiquidity, uint8 tmpDecimals) = getPairLiquidity();
-        require(minimumLiquidity * 10**uint256(tmpDecimals) < tmpLiquidity, 1112);
-
-        // Check if this user has unfinished deposits
-        if(_swapTokenStatus[msg.pubkey()].dtRequested != 0)
-        {
-            if(now - _swapTokenStatus[msg.pubkey()].dtRequested <= 60 && !_swapTokenStatus[msg.pubkey()].done) // we give it 1 minute to process
-            {
-                require(false, 5555);
-            }
-            else
-            {
-                delete _swapTokenStatus[msg.pubkey()];
-            }
-        }
-
         tvm.accept();
+
+        (uint256 tmpLiquidity, uint8 tmpDecimals) = getPairLiquidity();
+        require(minimumLiquidity * 10**uint256(tmpDecimals) < tmpLiquidity, ERROR_NOT_ENOUGH_LIQUIDITY);
+
+        delete _swapTokenStatus[msg.pubkey()];
 
         // TODO
         (uint256 price, uint8 decimals) = getPrice(tokenToGet, tokenToGive, amountToGive);
@@ -510,11 +501,23 @@ contract SymbolPair is ISymbolPair//, IRootTokenWallet_DeployEmptyWallet
         _swapTokenStatus[msg.pubkey()].dtRequested      = now;
         _swapTokenStatus[msg.pubkey()].direction        = (tokenToGet == _symbol1.symbolRTW); // true means "get symbol1 and give symbol2", false means "give symbol1 and get symbol2"
         _swapTokenStatus[msg.pubkey()].symbol1Requested = (tokenToGet == _symbol1.symbolRTW ? uint128(price) : uint128(amountToGive));
-        _swapTokenStatus[msg.pubkey()].symbol2Requested = (tokenToGet == _symbol1.symbolRTW ? uint128(price) : uint128(amountToGive));
+        _swapTokenStatus[msg.pubkey()].symbol1TTW       = (tokenToGet == _symbol1.symbolRTW ? ttwTokenToGet : ttwTokenToGive);
+        _swapTokenStatus[msg.pubkey()].symbol2Requested = (tokenToGet == _symbol1.symbolRTW ? uint128(amountToGive) : uint128(price));
+        _swapTokenStatus[msg.pubkey()].symbol1TTW       = (tokenToGet == _symbol1.symbolRTW ? ttwTokenToGive : ttwTokenToGet);
         _swapTokenStatus[msg.pubkey()].done = false;
 
-        address RTW = (_swapTokenStatus[msg.pubkey()].direction ? _symbol2.symbolRTW : _symbol1.symbolRTW ); 
-        IRootTokenWallet(RTW).getWalletAddressZPK{value: 1 ton, callback: callbackSwapGetTTWAddress}(msg.pubkey(), addressZero);
+        if(tokenToGet == _symbol1.symbolRTW)
+        {
+            ITonTokenWallet(ttwTokenToGive).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackSwapGetTransferResult}(_swapTokenStatus[msg.pubkey()].symbol2Requested, _symbol2.symbolTTW);
+        }
+        else
+        {
+            ITonTokenWallet(ttwTokenToGive).sendMyTokensUsingAllowanceZPK{value: 1 ton, callback: callbackSwapGetTransferResult}(_swapTokenStatus[msg.pubkey()].symbol1Requested, _symbol1.symbolTTW);
+        }
+
+        //address RTW = (_swapTokenStatus[msg.pubkey()].direction ? _symbol2.symbolRTW : _symbol1.symbolRTW ); 
+        //IRootTokenWallet(RTW).getWalletAddressZPK{value: 1 ton, callback: callbackSwapGetTTWAddress}(msg.pubkey(), addressZero);
+
     }
 }
 

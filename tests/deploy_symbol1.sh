@@ -28,7 +28,7 @@ deploy_ttw () {
     echo "===================================================================================================="
     LOCAL_KEYS=$1
     LOKAL_PK=$(cat $LOCAL_KEYS | grep public | cut -c 14-77)
-    tonos-cli -u $NETWORK call --abi ../contracts/RTW_FT.abi.json $RTW_ADDRESS deployWallet '{"tokens":100000000000000,"grams":"1000000000","walletPublicKey":"0x'$LOKAL_PK'","ownerAddress":"'$ZERO_ADDRESS'"}' --sign $KEYS_FILE
+    tonos-cli -u $NETWORK call --abi ../contracts/RTW_FT.abi.json $RTW_ADDRESS deployWallet '{"tokens":100000000000000000,"grams":"1000000000","walletPublicKey":"0x'$LOKAL_PK'","ownerAddress":"'$ZERO_ADDRESS'"}' --sign $KEYS_FILE
 }
 
 deploy_ttw "keys1.json"
